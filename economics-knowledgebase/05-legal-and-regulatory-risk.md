@@ -1,6 +1,6 @@
 # 05 Legal and Regulatory Risk
 
-**Not legal advice.** The area is moving quickly. Items marked [Unverified] come from a single or secondary source. A real project would need securities/commodities and election-law counsel.
+**Not legal advice.** **Outside the current model's scope:** the model assumes the donation and hedge are legal and feasible, with no platform risk, taxes or reputation cost. This note is background for possible extensions. The area is moving quickly. Items marked [Unverified] come from a single or secondary source. A real project would need securities/commodities and election-law counsel.
 
 ## Federal framework
 - Event contracts on US venues are regulated by the CFTC under the Commodity Exchange Act. Kalshi is a registered DCM; Polymarket US (QCX LLC) is a DCM since Dec 2025 rollout. [Established, see file 02.]
@@ -24,7 +24,8 @@
 Public disclosure of "donor funded A and bet against A" could damage credibility with the candidate, voters, and donor peers; it also invites press framing as manipulation. Not quantifiable from sources; treat as a scenario cost.
 
 ## Implications for this project
-- Add a binary feasibility layer: venue available, position-limit cap `H_max`, KYC, jurisdiction.
-- Cap `hedge` at `min(depth-implied, position limit)`.
-- Include a "legal/reputation cost" scalar and a probability-of-regulatory-action scenario in Monte Carlo.
+Legality, platform risk, taxes and reputation are all assumed away in the current model (static, one binary contract, `D` and `H` always allowed). The hedge's economics (zero-EV, full hedge optimal for any risk-averse donor) are therefore conditional on legal clearance.
+- A future feasibility layer (venue available, KYC, jurisdiction) would be a binary switch on whether any hedge `H > 0` is allowed.
+- A future position-limit cap `H_max` would make the hedge `min(H, H_max)`; if `H_max < full_hedge_size` (the default full hedge is about $52M) only a partial hedge is possible and variance cannot be fully removed.
+- A "legal/reputation cost" scalar and a probability-of-regulatory-action scenario would enter as a positive hedge cost (lower EV and CE), so a risk-averse donor would hedge less than fully.
 - Output should state hedge viability is conditional on legal clearance; do not model evasion (multi-account splitting to avoid limits is likely a terms violation).

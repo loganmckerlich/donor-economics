@@ -73,7 +73,15 @@ cd frontend && npm install && npm run dev
 
 Set `BACKEND_URL` if the API is not on `http://127.0.0.1:8000`. API tests: `cd backend && ../.venv/bin/pytest`.
 
-The dashboard has sliders for every model parameter, summary cards for the optimal strategy, and six charts: win probability vs donation (three functional forms), EV of donating vs not donating, payoffs vs hedge size, hedge value vs hedge size at three risk-aversion levels, a heatmap of the optimal donation over effect size and payoff, and a heatmap of the value of hedging over risk aversion and donation. "Apply optimal strategy" jumps to the best donation and a full hedge.
+The Explorer page is organised in three sections, each with its own sliders beside the charts they drive:
+
+- **A. Does the donation pay?** Payoff, base win probability, donation-effect form, size and scale, and the donation. Charts 1 (win probability) and 2 (EV of donating vs not).
+- **B. How should the donor hedge?** Donation, hedge size (or the full hedge), risk aversion and wealth. Charts 3 (payoffs vs hedge size) and 4 (value of hedging).
+- **C. Where does it pay?** Heatmaps of the optimal donation (effect size x payoff) and of the value of hedging (risk aversion x donation). Charts 5 and 6.
+
+Hover any control (or focus it with the keyboard) for a plain-language explanation of what it is and does. Each slider carries numbered chips for the charts it changes: hovering a chip says whether the control reshapes that chart or only moves your marker, and hovering or focusing the slider outlines those charts. Hover any headline number in the top bar for what it means. When you move a slider, the previous curves stay behind as faint dotted "before" lines (and a dashed ring on the heatmaps) until the next change or "Clear before lines". A sticky bar at the top keeps the headline numbers and the "Apply optimal strategy" button in view.
+
+The **Glossary** page (`/glossary`) presents the `economics-knowledgebase/` files: a searchable list of terms, each topic note, and the sources. The backend serves the markdown from `GET /api/knowledge` and `GET /api/knowledge/{slug}`.
 
 ## Setup
 

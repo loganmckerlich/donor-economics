@@ -1,6 +1,7 @@
 # 07 Glossary and Sources
 
 ## Glossary
+
 | Term | Meaning |
 |---|---|
 | Binary contract | Pays $1 if event occurs, else $0 |
@@ -9,7 +10,7 @@
 | Maker / taker | Provider of resting liquidity / order that crosses the spread |
 | Spread | Best ask minus best bid |
 | Slippage | Difference between expected and executed price |
-| Price impact | Move in price caused by your order |
+| Price impact | Move in price caused by your order (assumed zero in the current model) |
 | Kyle's lambda | Linear impact coefficient |
 | DCM | Designated Contract Market (CFTC-registered exchange) |
 | ECP | Eligible Contract Participant |
@@ -20,8 +21,19 @@
 | Favorite-longshot bias | Longshots overpriced, favorites underpriced relative to realised frequencies |
 | Kelly criterion | Bet size maximising expected log wealth |
 | CRRA / CARA | Constant relative / absolute risk aversion utility |
-| Certainty equivalent | Sure amount with the same utility as a gamble |
+| CARA coefficient `a` (`risk_aversion`) | Absolute risk aversion in 1/$ in `u(x) = -exp(-a x)`; `a = 0` is risk-neutral; roughly `gamma / wealth` for a CRRA investor |
+| Certainty equivalent | Sure amount with the same utility as a gamble; for CARA, `-ln(E[exp(-a x)]) / a`, equal to EV when `a = 0` and lower than EV for risky payoffs when `a > 0` |
 | Full hedge | Position making payoff identical in both states |
+| Full hedge size `H*` | `V*(1 - m)` dollars of NO, which equalises the win and lose payoffs; `full_hedge_size` in the model |
+| Zero-EV hedge | A hedge bought at a fair price with no frictions: it changes variance but not expected value, so any risk-averse donor fully hedges |
+| Donation effect curve `p(D)` | Win probability as a function of donation; default `min(p0 + k*ln(1 + D/s), 0.999)`, with linear and saturating alternatives (`effect_form`) |
+| Effect size `k` (`effect_size`) | Win-probability gain per unit of the curve (per `ln(1 + D/s)` for the log form); default 0.015, unverified |
+| Effect scale `s` (`effect_scale`) | Dollar scale of the donation curve; default $10M |
+| Base win probability `p0` (`base_win_prob`) | Probability A wins with no donation |
+| Payoff if win `V` (`payoff_if_win`) | Amount the donor receives if and only if A wins |
+| Efficient market repricing | The market is assumed to price in the donation, so the YES price is `m = p(D)` and the NO hedge costs `1 - m` per share; the donor has no edge |
+| Donation EV | `(p(D) - p(0))*V - D`: expected gain from donating relative to not donating (`donation_ev`), independent of the hedge in the model |
+| Price impact (out of scope) | Move in price caused by your order; the model assumes the whole order fills at the quoted price, so impact, depth, fees and carry cost are possible extensions |
 | Basis risk | Hedge instrument imperfectly matching exposure (e.g. a market resolving on a different event than the policy payoff) |
 
 ## Sources (retrieved 2026-11-05; headline claims only, see individual files)
@@ -66,4 +78,4 @@ Legal/regulatory
 - Tax treatment of prediction market gains.
 
 ## Implications for this project
-Keep a `sources.md`-style link per parameter default in code comments; mark defaults `unverified` until checked.
+Keep a `sources.md`-style link per parameter default in code comments; mark defaults `unverified` until checked. In particular, `effect_size = 0.015` and `effect_scale = $10M` are placeholders, and their calibration (file 04) drives the donation result. Open questions on depth, fees, position limits, insider status and taxes concern frictions that are outside the current model's scope; they would matter only if those frictions are added as extensions.

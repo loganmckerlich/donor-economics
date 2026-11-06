@@ -1,11 +1,11 @@
 from dataclasses import asdict
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from donor_economics import Scenario
 
-from . import analysis
+from . import analysis, knowledge
 from .schemas import AnalysisIn, DonationHeatmapIn, HedgeValueIn
 
 app = FastAPI(title="Donor Economics API", version="0.1.0")
@@ -44,3 +44,16 @@ def post_hedge_value(body: HedgeValueIn) -> dict:
     return analysis.hedge_value_heatmap(
         body.scenario.to_model(), body.risk_aversion_range, body.donation_range, body.n
     )
+
+
+@app.get("/api/knowledge")
+def list_knowledge() -> list[dict]:
+    return knowledge.list_docs()
+
+
+@app.get("/api/knowledge/{slug}")
+def get_knowledge(slug: str) -> dict:
+    doc = knowledge.get_doc(slug)
+    if doc is None:
+        raise HTTPException(status_code=404, detail="unknown document")
+    return doc

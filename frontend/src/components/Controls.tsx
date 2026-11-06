@@ -1,6 +1,8 @@
 "use client";
 
+import { createContext, useContext, useRef } from "react";
 import type { EffectForm } from "@/lib/api";
+import Tip, { T } from "./Tip";
 
 export interface UiState {
   payoff: number; // $
@@ -28,100 +30,214 @@ export const DEFAULT_UI: UiState = {
   hedge: 25e6,
 };
 
-function Slider(props: {
-  label: string; hint?: string; value: number; min: number; max: number; step: number;
+export type ParamId =
+  | "payoff" | "baseProb" | "effectSize" | "effectScale" | "effectForm"
+  | "donation" | "hedge" | "gamma" | "wealth";
+
+export const CHART_TITLES: Record<number, string> = {
+  1: "Donation → win probability",
+  2: "Expected value of donating",
+  3: "Hedge size → payoffs",
+  4: "Hedge size → value to the donor",
+  5: "When is donating worth it?",
+  6: "When is hedging worth it?",
+};
+
+/** Charts each parameter changes: "curve" reshapes the chart, "marker" only moves your scenario's marker or line. */
+export const AFFECTS: Record<ParamId, Record<number, "curve" | "marker">> = {
+  baseProb: { 1: "curve", 3: "curve", 4: "curve", 6: "curve" },
+  payoff: { 2: "curve", 3: "curve", 4: "curve", 5: "marker", 6: "curve" },
+  effectSize: { 1: "curve", 2: "curve", 3: "curve", 4: "curve", 5: "marker", 6: "curve" },
+  effectScale: { 1: "curve", 2: "curve", 3: "curve", 4: "curve", 5: "curve", 6: "curve" },
+  effectForm: { 1: "curve", 2: "curve", 3: "curve", 4: "curve", 5: "curve", 6: "curve" },
+  donation: { 1: "marker", 2: "marker", 3: "curve", 4: "curve", 6: "marker" },
+  hedge: { 3: "marker", 4: "marker" },
+  gamma: { 4: "curve", 6: "marker" },
+  wealth: { 4: "curve", 6: "marker" },
+};
+export const affectedCharts = (p: ParamId) => Object.keys(AFFECTS[p]).map(Number);
+
+const TIPS: Record<ParamId, React.ReactNode> = {
+  payoff: (
+    <T title="Payoff if the candidate wins (V)">
+      What the donor receives, in dollars, if their candidate wins. They receive nothing if the candidate loses.
+      A bigger V makes both donating and hedging matter more.
+    </T>
+  ),
+  baseProb: (
+    <T title="Win probability with no donation (p₀)">
+      The chance the candidate wins if the donor gives nothing. The donation then adds to this.
+      It is also the market price of &ldquo;wins&rdquo; before any money is spent.
+    </T>
+  ),
+  effectForm: (
+    <T title="Functional form of the donation effect">
+      How donated dollars turn into win probability. <b className="text-ink">Log</b> (default): each extra dollar helps
+      less than the last. <b className="text-ink">Saturating</b>: the effect levels off at +k.{" "}
+      <b className="text-ink">Linear</b>: every dollar helps equally, so it can reach 100%.
+    </T>
+  ),
+  effectSize: (
+    <T title="Effect size (k)">
+      How strongly money moves the win probability. With the log form, the win probability rises by about
+      k × ln(1 + D/s). Studies of campaign spending find effects of a few points at most, so small values are realistic.
+    </T>
+  ),
+  effectScale: (
+    <T title="Effect scale (s)">
+      The dollar size at which returns start to fade. A small s means the first few million dollars do most of the work.
+      A large s means the effect builds slowly. The first dollar always returns V × k / s in expected winnings.
+    </T>
+  ),
+  donation: (
+    <T title="Donation (D)">
+      What the donor gives, in dollars. It is spent whether the candidate wins or loses, and it raises the win
+      probability along the donation-effect curve. The market price of &ldquo;wins&rdquo; rises with it.
+    </T>
+  ),
+  hedge: (
+    <T title="Hedge size (H)">
+      Dollars spent buying &ldquo;NO&rdquo; (candidate loses) on the prediction market. It pays out if the candidate
+      loses and is lost if they win. The price is fair, so the hedge does not change expected profit. It only narrows
+      the gap between the win and lose outcomes.
+    </T>
+  ),
+  gamma: (
+    <T title="Risk aversion (γ)">
+      How much the donor dislikes uncertain outcomes. 0 means they only care about the average, so hedging is
+      pointless. Around 2 is a common benchmark. Higher values pay more to avoid risk.
+    </T>
+  ),
+  wealth: (
+    <T title="Donor wealth">
+      Combined with γ to set risk aversion in dollar terms: a = γ / wealth. A wealthier donor is bothered less by a
+      swing of tens of millions, so hedging is worth less to them.
+    </T>
+  ),
+};
+
+interface Ctx {
+  set: (patch: Partial<UiState>) => void;
+  /** the parameter the user is hovering or focused on, to outline the charts it drives */
+  setActive: (id: ParamId | null) => void;
+  /** remember the current charts as the "before" line, called when an interaction starts */
+  snapshot: () => void;
+}
+export const ControlCtx = createContext<Ctx>({ set: () => {}, setActive: () => {}, snapshot: () => {} });
+
+function Chips({ param }: { param: ParamId }) {
+  return (
+    <span className="flex items-center gap-1">
+      {Object.entries(AFFECTS[param]).map(([n, kind]) => (
+        <Tip
+          key={n} focusable align="right" width="w-56" className="inline-flex"
+          content={
+            <T title={`Chart ${n}`}>
+              {CHART_TITLES[Number(n)]}.{" "}
+              {kind === "curve" ? "This control reshapes the chart." : "This control only moves your scenario's marker on the chart."}
+            </T>
+          }
+        >
+          <span className="inline-flex h-4 min-w-4 cursor-default items-center justify-center rounded-full border border-axis px-1 text-[10px] leading-none text-ink-3">
+            {n}
+          </span>
+        </Tip>
+      ))}
+    </span>
+  );
+}
+
+function Field({ param, label, display, readout, children }: {
+  param: ParamId; label: string; display?: string; readout?: string; children: React.ReactNode;
+}) {
+  const { setActive } = useContext(ControlCtx);
+  return (
+    <div
+      onPointerEnter={() => setActive(param)}
+      onPointerLeave={() => setActive(null)}
+      onFocus={() => setActive(param)}
+      onBlur={() => setActive(null)}
+    >
+      <Tip content={TIPS[param]} width="w-full min-w-64">
+        <div className="flex items-baseline justify-between gap-2 text-sm">
+          <span className="text-ink">{label}</span>
+          {display !== undefined && <span className="font-mono tabular-nums text-ink-2">{display}</span>}
+        </div>
+        {children}
+      </Tip>
+      <div className="mt-1 flex items-center justify-between gap-2">
+        <span className="text-xs text-ink-3">{readout}</span>
+        <Chips param={param} />
+      </div>
+    </div>
+  );
+}
+
+export function SliderField(props: {
+  param: ParamId; label: string; readout?: string; value: number; min: number; max: number; step: number;
   display: string; onChange: (v: number) => void;
 }) {
-  const { label, hint, value, min, max, step, display, onChange } = props;
+  const { param, label, readout, value, min, max, step, display, onChange } = props;
+  const { snapshot } = useContext(ControlCtx);
+  const armed = useRef(true); // first key press of a keyboard interaction snapshots once
   return (
-    <label className="block">
-      <div className="flex items-baseline justify-between text-sm">
-        <span className="text-ink">{label}</span>
-        <span className="font-mono tabular-nums text-ink-2">{display}</span>
-      </div>
+    <Field param={param} label={label} display={display} readout={readout}>
       <input
-        type="range" min={min} max={max} step={step} value={value}
+        type="range" min={min} max={max} step={step} value={value} aria-label={label}
+        onPointerDown={() => snapshot()}
+        onKeyDown={() => { if (armed.current) { snapshot(); armed.current = false; } }}
+        onBlur={() => { armed.current = true; }}
         onChange={(e) => onChange(Number(e.target.value))}
         className="mt-1 h-1.5 w-full cursor-pointer accent-[var(--series-1)]"
       />
-      {hint && <div className="mt-0.5 text-xs text-ink-3">{hint}</div>}
-    </label>
+    </Field>
   );
 }
 
-function Group({ title, children }: { title: string; children: React.ReactNode }) {
+export function FormField({ value, onChange }: { value: EffectForm; onChange: (v: EffectForm) => void }) {
+  const { snapshot } = useContext(ControlCtx);
   return (
-    <fieldset className="space-y-4 border-t border-grid pt-4 first:border-0 first:pt-0">
-      <legend className="mb-3 text-xs font-medium uppercase tracking-wide text-ink-3">{title}</legend>
-      {children}
-    </fieldset>
-  );
-}
-
-export default function Controls({
-  ui, set, onApplyOptimal, optimalDonation,
-}: {
-  ui: UiState;
-  set: (patch: Partial<UiState>) => void;
-  onApplyOptimal: () => void;
-  optimalDonation: number | null;
-}) {
-  const m = (v: number) => `$${(v / 1e6).toFixed(0)}M`;
-  return (
-    <div className="space-y-5 rounded-xl border border-grid bg-surface p-4">
-      <button
-        onClick={onApplyOptimal}
-        className="w-full rounded-lg bg-series-1 px-3 py-2 text-sm font-medium text-white hover:opacity-90"
+    <Field param="effectForm" label="Functional form">
+      <select
+        value={value} aria-label="Functional form"
+        onChange={(e) => { snapshot(); onChange(e.target.value as EffectForm); }}
+        className="mt-1 w-full rounded-md border border-axis bg-surface px-2 py-1.5 text-sm"
       >
-        Apply optimal strategy{optimalDonation !== null && ` (donate ${m(optimalDonation)}, full hedge)`}
-      </button>
+        <option value="log">Logarithmic: k·ln(1 + D/s)</option>
+        <option value="saturating">Saturating: k·(1 − e^(−D/s))</option>
+        <option value="linear">Linear: k·D/s</option>
+      </select>
+    </Field>
+  );
+}
 
-      <Group title="Strategy">
-        <Slider label="Donation" value={ui.donation} min={0} max={300e6} step={1e6}
-          display={m(ui.donation)} onChange={(v) => set({ donation: v })} />
+export function FullHedgeToggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+  const { snapshot, setActive } = useContext(ControlCtx);
+  return (
+    <div onPointerEnter={() => setActive("hedge")} onPointerLeave={() => setActive(null)}>
+      <Tip
+        width="w-full min-w-64"
+        content={
+          <T title="Use the full hedge">
+            Sets the hedge to the exact amount that makes your profit identical whether the candidate wins or
+            loses, so all risk is gone. Uncheck it to choose a hedge size yourself.
+          </T>
+        }
+      >
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={ui.fullHedge} onChange={(e) => set({ fullHedge: e.target.checked })}
-            className="accent-[var(--series-1)]" />
+          <input
+            type="checkbox" checked={checked}
+            onChange={(e) => { snapshot(); onChange(e.target.checked); }}
+            className="accent-[var(--series-1)]"
+          />
           Use the full (zero-variance) hedge
         </label>
-        <div className={ui.fullHedge ? "opacity-40" : ""}>
-          <Slider label="Hedge (spend on NO)" value={ui.hedge} min={0} max={200e6} step={1e6}
-            display={m(ui.hedge)} onChange={(v) => set({ hedge: v, fullHedge: false })} />
-        </div>
-      </Group>
-
-      <Group title="Payoff">
-        <Slider label="Payoff if candidate wins (V)" value={ui.payoff} min={20e6} max={500e6} step={5e6}
-          display={m(ui.payoff)} onChange={(v) => set({ payoff: v })} />
-        <Slider label="Win probability with no donation" value={ui.baseProb} min={0.05} max={0.95} step={0.01}
-          display={`${(ui.baseProb * 100).toFixed(0)}%`} onChange={(v) => set({ baseProb: v })} />
-      </Group>
-
-      <Group title="Donation effect on winning">
-        <label className="block text-sm">
-          <span className="text-ink">Functional form</span>
-          <select value={ui.effectForm} onChange={(e) => set({ effectForm: e.target.value as EffectForm })}
-            className="mt-1 w-full rounded-md border border-axis bg-surface px-2 py-1.5 text-sm">
-            <option value="log">Logarithmic: k·ln(1 + D/s)</option>
-            <option value="saturating">Saturating: k·(1 − e^(−D/s))</option>
-            <option value="linear">Linear: k·D/s</option>
-          </select>
-        </label>
-        <Slider label="Effect size (k)" value={ui.effectSize} min={0} max={0.1} step={0.001}
-          display={ui.effectSize.toFixed(3)} onChange={(v) => set({ effectSize: v })}
-          hint="Win-probability points gained per unit of the curve" />
-        <Slider label="Effect scale (s)" value={ui.effectScale} min={1e6} max={100e6} step={1e6}
-          display={m(ui.effectScale)} onChange={(v) => set({ effectScale: v })}
-          hint="Smaller s: effect arrives with fewer dollars" />
-      </Group>
-
-      <Group title="Risk aversion">
-        <Slider label="Risk aversion (γ)" value={ui.gamma} min={0} max={20} step={0.5}
-          display={ui.gamma === 0 ? "risk-neutral" : ui.gamma.toFixed(1)} onChange={(v) => set({ gamma: v })} />
-        <Slider label="Donor wealth" value={ui.wealthB} min={0.5} max={100} step={0.5}
-          display={`$${ui.wealthB}B`} onChange={(v) => set({ wealthB: v })}
-          hint={`CARA a = γ / wealth = ${(ui.gamma / (ui.wealthB * 1e9)).toExponential(1)}`} />
-      </Group>
+      </Tip>
     </div>
   );
+}
+
+/** A section's left-hand control column. */
+export function ControlPanel({ children }: { children: React.ReactNode }) {
+  return <div className="space-y-5 rounded-xl border border-grid bg-surface p-4 lg:self-start">{children}</div>;
 }

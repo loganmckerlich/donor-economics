@@ -14,6 +14,8 @@ interface Props {
   yTitle: string;
   yScale?: "linear" | "log";
   marker?: { x: number; y: number; label: string };
+  /** where the marker was before the last change */
+  ghost?: { x: number; y: number } | null;
   ariaLabel: string;
   height?: number;
 }
@@ -29,7 +31,7 @@ function fracIndex(grid: number[], v: number, log = false): number {
 }
 
 export default function Heatmap({
-  xs, ys, z, xFormat, yFormat, valueFormat, xTitle, yTitle, yScale = "linear", marker, ariaLabel, height = 300,
+  xs, ys, z, xFormat, yFormat, valueFormat, xTitle, yTitle, yScale = "linear", marker, ghost, ariaLabel, height = 300,
 }: Props) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<[number, number] | null>(null);
@@ -49,6 +51,9 @@ export default function Heatmap({
 
   const mx = marker ? M.l + (fracIndex(xs, marker.x) + 0.5) * cw : 0;
   const my = marker ? M.t + ih - (fracIndex(ys, marker.y, yScale === "log") + 0.5) * ch : 0;
+
+  const gx = ghost ? M.l + (fracIndex(xs, ghost.x) + 0.5) * cw : 0;
+  const gy = ghost ? M.t + ih - (fracIndex(ys, ghost.y, yScale === "log") + 0.5) * ch : 0;
 
   return (
     <div>
@@ -78,6 +83,13 @@ export default function Heatmap({
           ))}
           <text x={M.l + iw / 2} y={height - 6} textAnchor="middle" fontSize={11} fill="var(--ink-2)">{xTitle}</text>
           <text transform={`translate(12 ${M.t + ih / 2}) rotate(-90)`} textAnchor="middle" fontSize={11} fill="var(--ink-2)">{yTitle}</text>
+          {ghost && marker && (Math.abs(gx - mx) > 1 || Math.abs(gy - my) > 1) && (
+            <g pointerEvents="none">
+              <line x1={gx} y1={gy} x2={mx} y2={my} stroke="var(--ink)" strokeWidth={1} strokeDasharray="2 3" opacity={0.7} />
+              <circle cx={gx} cy={gy} r={6} fill="none" stroke="var(--surface)" strokeWidth={4} />
+              <circle cx={gx} cy={gy} r={6} fill="none" stroke="var(--ink)" strokeWidth={1.5} strokeDasharray="2 2" />
+            </g>
+          )}
           {marker && (
             <g pointerEvents="none">
               <circle cx={mx} cy={my} r={7} fill="none" stroke="var(--surface)" strokeWidth={4} />

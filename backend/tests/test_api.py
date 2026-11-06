@@ -40,3 +40,17 @@ def test_heatmaps():
     assert j["optimal_donation"][0][0] == 0  # k = 0: donating never pays
     j = c.post("/api/sweep/hedge-value", json={"n": 6}).json()
     assert all(v >= -1 for row in j["ce_gain"] for v in row)  # hedging never hurts CE
+
+
+def test_knowledge_list_and_get():
+    docs = c.get("/api/knowledge").json()
+    slugs = [d["slug"] for d in docs]
+    assert slugs[0] == "overview" and "01-hedging-and-risk" in slugs and len(slugs) == 8
+    doc = c.get("/api/knowledge/01-hedging-and-risk").json()
+    assert doc["title"].startswith("01") and "Implications for this project" in doc["markdown"]
+
+
+def test_knowledge_unknown_and_traversal_rejected():
+    assert c.get("/api/knowledge/nope").status_code == 404
+    assert c.get("/api/knowledge/..%2Fpyproject").status_code == 404
+    assert c.get("/api/knowledge/%2e%2e/README").status_code == 404

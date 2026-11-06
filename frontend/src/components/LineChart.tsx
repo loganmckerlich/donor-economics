@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { niceTicks } from "@/lib/format";
 import { useWidth } from "./useWidth";
 
@@ -12,6 +12,10 @@ export interface Series {
   dashed?: boolean;
   /** show the label at the line end */
   direct?: boolean;
+  /** faint dashed "before your last change" line: drawn clipped, no label, no tooltip row */
+  ghost?: boolean;
+  /** own x values (ghost lines come from a different scenario, so their x grid can differ) */
+  x?: number[];
 }
 
 export interface VLine {
@@ -40,11 +44,21 @@ export default function LineChart({
 }: Props) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
+  const clipId = useId();
+  const live = series.filter((s) => !s.ghost);
+  const ghosts = series.filter((s) => s.ghost);
 
   const { xMin, xMax, yMin, yMax, yTicks, xTicks } = useMemo(() => {
     const xMin = x[0], xMax = x[x.length - 1];
     let lo = Infinity, hi = -Infinity;
-    for (const s of series) for (const v of s.y) { lo = Math.min(lo, v); hi = Math.max(hi, v); }
+    for (const s of series) {
+      const sxs = s.x ?? x;
+      s.y.forEach((v, i) => {
+        if (s.ghost && (sxs[i] < xMin || sxs[i] > xMax)) return;
+        lo = Math.min(lo, v);
+        hi = Math.max(hi, v);
+      });
+    }
     if (zeroLine) { lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
     if (yDomain) [lo, hi] = yDomain;
     if (lo === hi) { lo -= 1; hi += 1; }
@@ -64,10 +78,11 @@ export default function LineChart({
   const sx = (v: number) => M.l + ((v - xMin) / (xMax - xMin || 1)) * iw;
   const sy = (v: number) => M.t + (1 - (v - yMin) / (yMax - yMin || 1)) * ih;
 
-  const path = (ys: number[]) => ys.map((v, i) => `${i ? "L" : "M"}${sx(x[i]).toFixed(1)},${sy(v).toFixed(1)}`).join("");
+  const path = (ys: number[], xs: number[] = x) =>
+    ys.map((v, i) => `${i ? "L" : "M"}${sx(xs[i]).toFixed(1)},${sy(v).toFixed(1)}`).join("");
 
   // direct labels at the line end, nudged apart
-  const labels = series
+  const labels = live
     .filter((s) => s.direct !== false)
     .map((s) => ({ s, y: sy(s.y[s.y.length - 1]) }))
     .sort((a, b) => a.y - b.y);
@@ -116,7 +131,20 @@ export default function LineChart({
             </g>
           ))}
 
-          {series.map((s) => (
+          <defs>
+            <clipPath id={clipId}><rect x={M.l} y={M.t} width={iw} height={ih} /></clipPath>
+          </defs>
+          {ghosts.map((s) => (
+            <path key={s.key} d={path(s.y, s.x)} fill="none" stroke="var(--ink-3)" strokeWidth={1.5}
+              strokeDasharray="2 3" opacity={0.85} clipPath={`url(#${clipId})`} />
+          ))}
+          {ghosts.length > 0 && (
+            <g>
+              <line x1={M.l + iw - 118} x2={M.l + iw - 100} y1={9} y2={9} stroke="var(--ink-3)" strokeWidth={1.5} strokeDasharray="2 3" />
+              <text x={M.l + iw} y={9} dy="0.32em" textAnchor="end" fontSize={11} fill="var(--ink-3)">before last change</text>
+            </g>
+          )}
+          {live.map((s) => (
             <path key={s.key} d={path(s.y)} fill="none" stroke={s.color} strokeWidth={2}
               strokeLinejoin="round" strokeLinecap="round" strokeDasharray={s.dashed ? "6 4" : undefined} />
           ))}
@@ -131,7 +159,7 @@ export default function LineChart({
           {hover !== null && (
             <g pointerEvents="none">
               <line x1={hx} x2={hx} y1={M.t} y2={M.t + ih} stroke="var(--ink-3)" strokeWidth={1} />
-              {series.map((s) => (
+              {live.map((s) => (
                 <circle key={s.key} cx={hx} cy={sy(s.y[hover])} r={4} fill={s.color} stroke="var(--surface)" strokeWidth={2} />
               ))}
             </g>
@@ -145,7 +173,7 @@ export default function LineChart({
             style={{ top: M.t, [tipLeft ? "right" : "left"]: tipLeft ? width - hx + 12 : hx + 12 }}
           >
             <div className="mb-1 font-medium text-ink">{xFormat(x[hover])}</div>
-            {series.map((s) => (
+            {live.map((s) => (
               <div key={s.key} className="flex items-center gap-2 text-ink-2">
                 <span className="inline-block h-[3px] w-3 rounded-sm" style={{ background: s.color }} />
                 <span>{s.label}</span>
@@ -163,14 +191,14 @@ export default function LineChart({
             <thead>
               <tr className="text-ink-2">
                 <th className="py-1 pr-3 text-left font-medium">{xTitle}</th>
-                {series.map((s) => <th key={s.key} className="px-2 font-medium">{s.label}</th>)}
+                {live.map((s) => <th key={s.key} className="px-2 font-medium">{s.label}</th>)}
               </tr>
             </thead>
             <tbody>
               {x.map((xv, i) => (i % stride === 0 || i === x.length - 1) && (
                 <tr key={i} className="border-t border-grid">
                   <td className="py-1 pr-3 text-left">{xFormat(xv)}</td>
-                  {series.map((s) => <td key={s.key} className="px-2">{yFormat(s.y[i])}</td>)}
+                  {live.map((s) => <td key={s.key} className="px-2">{yFormat(s.y[i])}</td>)}
                 </tr>
               ))}
             </tbody>
