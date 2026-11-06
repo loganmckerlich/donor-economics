@@ -48,7 +48,7 @@ export function sourcesSection(markdown: string): string {
 export const SCOPE: Record<string, { label: string; note: string }> = {
   "01-hedging-and-risk": {
     label: "In the model",
-    note: "Hedging, full-hedge size and risk aversion are core to the current model.",
+    note: "Hedging, risk-free hedge size and risk aversion are core to the current model.",
   },
   "02-prediction-market-mechanics": {
     label: "Mostly outside the model",

@@ -21,18 +21,26 @@
 | Favorite-longshot bias | Longshots overpriced, favorites underpriced relative to realised frequencies |
 | Kelly criterion | Bet size maximising expected log wealth |
 | CRRA / CARA | Constant relative / absolute risk aversion utility |
+| Risk aversion γ (gamma) | How much the donor dislikes uncertain outcomes, on the CRRA-style scale the app exposes: 0 is risk-neutral (only the average matters, so hedging is pointless) and about 2 is a common benchmark. The model converts it to the CARA coefficient `a = γ / wealth` |
+| Donor wealth | The donor's wealth, used only to turn γ into the dollar-based risk aversion `a = γ / wealth`; fixed at $5B by default. A wealthier donor is bothered less by a swing of tens of millions, so hedging is worth less to them |
 | CARA coefficient `a` (`risk_aversion`) | Absolute risk aversion in 1/$ in `u(x) = -exp(-a x)`; `a = 0` is risk-neutral; roughly `gamma / wealth` for a CRRA investor |
 | Certainty equivalent | Sure amount with the same utility as a gamble; for CARA, `-ln(E[exp(-a x)]) / a`, equal to EV when `a = 0` and lower than EV for risky payoffs when `a > 0` |
-| Full hedge | Position making payoff identical in both states |
-| Full hedge size `H*` | `V*(1 - m)` dollars of NO, which equalises the win and lose payoffs; `full_hedge_size` in the model |
+| Risk-free hedge (full hedge) | The amount bet on NO (candidate loses) that makes your profit identical whether the candidate wins or loses, so the outcome is certain |
+| Risk-free hedge size `H*` (full hedge size) | `V*(1 - m)` dollars of NO, the spend that makes profit identical whether the candidate wins or loses; `full_hedge_size` in the model |
+| Hedge (% of risk-free hedge) | The app's hedge slider: how much NO to buy as a share of the risk-free hedge. 0% is no hedge, 100% is the risk-free hedge, and above 100% over-hedges (you then do better if the candidate loses) |
+| Value of hedging | The certainty-equivalent gain from the risk-free hedge, in sure dollars: how much a hedged donor would pay to avoid the risk. It is zero for a risk-neutral donor and grows with risk aversion |
 | Zero-EV hedge | A hedge bought at a fair price with no frictions: it changes variance but not expected value, so any risk-averse donor fully hedges |
 | Donation effect curve `p(D)` | Win probability as a function of donation; default `min(p0 + k*ln(1 + D/s), 0.999)`, with linear and saturating alternatives (`effect_form`) |
-| Effect size `k` (`effect_size`) | Win-probability gain per unit of the curve (per `ln(1 + D/s)` for the log form); default 0.015, unverified |
+| Effect size `k` (`effect_size`) | Win-probability gain per unit of the curve (per `ln(1 + D/s)` for the log form); default 0.015, unverified. In the app k is not set directly but derived from the boost from a $50M donation |
+| Boost from a $50M donation | How many points of win probability a $50M donation buys; the app's main effect input. The effect size k is derived from it: `k = boost / curve shape at $50M`, e.g. `boost / ln(1 + 50M/s)` for the log form. Default about 2.7 points |
 | Effect scale `s` (`effect_scale`) | Dollar scale of the donation curve; default $10M |
 | Base win probability `p0` (`base_win_prob`) | Probability A wins with no donation |
 | Payoff if win `V` (`payoff_if_win`) | Amount the donor receives if and only if A wins |
 | Efficient market repricing | The market is assumed to price in the donation, so the YES price is `m = p(D)` and the NO hedge costs `1 - m` per share; the donor has no edge |
-| Donation EV | `(p(D) - p(0))*V - D`: expected gain from donating relative to not donating (`donation_ev`), independent of the hedge in the model |
+| Donation EV (Expected gain from your donation) | `(p(D) - p(0))*V - D`: expected gain from donating relative to not donating (`donation_ev`), independent of the hedge in the model. "Expected gain from your donation" is the app's name for this same quantity |
+| Best donation (optimal donation) | The donation that maximises expected profit compared with not donating (`optimal_donation`). $0 means donating does not pay at those assumptions |
+| First-dollar return | Expected winnings from the first dollar donated, `V*k/s`, the same for every curve form. Donating only pays when it exceeds $1 |
+| Break-even payoff | The payoff at which the first-dollar return reaches $1, `V = s/k`. With the default boost of 2.7 points and s = $10M (k about 0.0151) it is roughly $660M |
 | Price impact (out of scope) | Move in price caused by your order; the model assumes the whole order fills at the quoted price, so impact, depth, fees and carry cost are possible extensions |
 | Basis risk | Hedge instrument imperfectly matching exposure (e.g. a market resolving on a different event than the policy payoff) |
 

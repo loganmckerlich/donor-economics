@@ -14,7 +14,7 @@ Static, one binary contract. The donor receives `V` iff A wins; the donation `D`
 |---|---|---|
 | `payoff_if_win` (V) | Payoff if A wins | [01 hedging](01-hedging-and-risk.md), [04 donations](04-political-donations.md) |
 | `base_win_prob` (p0) | P(A wins) with no donation | [04 donations](04-political-donations.md), [06 quant](06-quantitative-methods.md) |
-| `effect_size` (k), `effect_scale` (s), `effect_form` | Donation effect curve p(D): log, linear or saturating | [04 donations](04-political-donations.md) |
+| `effect_size` (k; in the app derived from the "boost from a $50M donation"), `effect_scale` (s), `effect_form` | Donation effect curve p(D): log, linear or saturating | [04 donations](04-political-donations.md) |
 | `risk_aversion` (a) | CARA coefficient in 1/$, roughly gamma / wealth; 0 = risk-neutral | [01 hedging](01-hedging-and-risk.md), [06 quant](06-quantitative-methods.md) |
 | `donation` (D) decision | Sunk cost; judged by `donation_ev` | [04 donations](04-political-donations.md) |
 | `hedge` (H) decision | Dollars on NO at `1 - m`; full hedge `H* = V*(1 - m)` | [01 hedging](01-hedging-and-risk.md) |
