@@ -21,12 +21,14 @@ class AnalysisIn(BaseModel):
     scenario: ScenarioIn = ScenarioIn()
     donation: float = Field(50e6, ge=0, le=1e11)
     hedge: float | None = Field(25e6, ge=0, le=1e12)  # null = use the full hedge
+    # Hedge as a fraction of the full (zero-variance) hedge; takes precedence over `hedge` when set.
+    hedge_fraction: float | None = Field(None, ge=0, le=5)
 
 
 class DonationHeatmapIn(BaseModel):
     scenario: ScenarioIn = ScenarioIn()
     effect_size_range: tuple[float, float] = (0.0, 0.1)
-    payoff_range: tuple[float, float] = (20e6, 500e6)
+    payoff_range: tuple[float, float] = (20e6, 10e9)  # log-spaced
     n: int = Field(25, ge=5, le=60)
 
 

@@ -29,7 +29,7 @@ def defaults() -> dict:
 
 @app.post("/api/analysis")
 def post_analysis(body: AnalysisIn) -> dict:
-    return analysis.analysis(body.scenario.to_model(), body.donation, body.hedge)
+    return analysis.analysis(body.scenario.to_model(), body.donation, body.hedge, body.hedge_fraction)
 
 
 @app.post("/api/sweep/donation-heatmap")

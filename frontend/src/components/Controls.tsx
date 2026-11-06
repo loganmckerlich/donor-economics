@@ -6,32 +6,31 @@ import Tip, { T } from "./Tip";
 
 export interface UiState {
   payoff: number; // $
-  baseProb: number;
-  effectSize: number;
-  effectScale: number; // $
-  effectForm: EffectForm;
-  gamma: number; // CRRA-equivalent risk aversion
-  wealthB: number; // $B
+  boost: number; // win-probability boost from a $50M donation (0.027 = 2.7 points)
   donation: number; // $
-  fullHedge: boolean;
-  hedge: number; // $
+  hedgeFrac: number; // hedge as a fraction of the risk-free hedge
+  gamma: number; // CRRA-equivalent risk aversion
+  // advanced
+  baseProb: number;
+  effectForm: EffectForm;
+  effectScale: number; // $
+  wealthB: number; // $B
 }
 
 export const DEFAULT_UI: UiState = {
   payoff: 100e6,
-  baseProb: 0.45,
-  effectSize: 0.015,
-  effectScale: 10e6,
-  effectForm: "log",
-  gamma: 2,
-  wealthB: 5,
+  boost: 0.027,
   donation: 50e6,
-  fullHedge: false,
-  hedge: 25e6,
+  hedgeFrac: 0.5,
+  gamma: 2,
+  baseProb: 0.45,
+  effectForm: "log",
+  effectScale: 10e6,
+  wealthB: 5,
 };
 
 export type ParamId =
-  | "payoff" | "baseProb" | "effectSize" | "effectScale" | "effectForm"
+  | "payoff" | "baseProb" | "boost" | "effectScale" | "effectForm"
   | "donation" | "hedge" | "gamma" | "wealth";
 
 export const CHART_TITLES: Record<number, string> = {
@@ -47,7 +46,7 @@ export const CHART_TITLES: Record<number, string> = {
 export const AFFECTS: Record<ParamId, Record<number, "curve" | "marker">> = {
   baseProb: { 1: "curve", 3: "curve", 4: "curve", 6: "curve" },
   payoff: { 2: "curve", 3: "curve", 4: "curve", 5: "marker", 6: "curve" },
-  effectSize: { 1: "curve", 2: "curve", 3: "curve", 4: "curve", 5: "marker", 6: "curve" },
+  boost: { 1: "curve", 2: "curve", 3: "curve", 4: "curve", 5: "marker", 6: "curve" },
   effectScale: { 1: "curve", 2: "curve", 3: "curve", 4: "curve", 5: "curve", 6: "curve" },
   effectForm: { 1: "curve", 2: "curve", 3: "curve", 4: "curve", 5: "curve", 6: "curve" },
   donation: { 1: "marker", 2: "marker", 3: "curve", 4: "curve", 6: "marker" },
@@ -77,16 +76,18 @@ const TIPS: Record<ParamId, React.ReactNode> = {
       <b className="text-ink">Linear</b>: every dollar helps equally, so it can reach 100%.
     </T>
   ),
-  effectSize: (
-    <T title="Effect size (k)">
-      How strongly money moves the win probability. With the log form, the win probability rises by about
-      k × ln(1 + D/s). Studies of campaign spending find effects of a few points at most, so small values are realistic.
+  boost: (
+    <T title="Win-probability boost from a $50M donation">
+      How many points of win probability a $50M donation buys. Studies of campaign spending find effects of a few
+      points at most, so small values are realistic. Smaller donations buy less, and with the default (log) curve each
+      extra dollar helps a little less than the last.
     </T>
   ),
   effectScale: (
     <T title="Effect scale (s)">
-      The dollar size at which returns start to fade. A small s means the first few million dollars do most of the work.
-      A large s means the effect builds slowly. The first dollar always returns V × k / s in expected winnings.
+      The dollar size at which returns start to fade. A small s means the first few million dollars do most of the work;
+      a large s means the effect builds slowly. The boost from a $50M donation stays fixed, so this only changes how that
+      boost is spread across smaller and larger donations.
     </T>
   ),
   donation: (
@@ -96,10 +97,11 @@ const TIPS: Record<ParamId, React.ReactNode> = {
     </T>
   ),
   hedge: (
-    <T title="Hedge size (H)">
-      Dollars spent buying &ldquo;NO&rdquo; (candidate loses) on the prediction market. It pays out if the candidate
-      loses and is lost if they win. The price is fair, so the hedge does not change expected profit. It only narrows
-      the gap between the win and lose outcomes.
+    <T title="Hedge (% of the risk-free hedge)">
+      How much to bet on &ldquo;NO&rdquo; (candidate loses) on the prediction market, as a share of the amount that
+      removes all risk. 0% is no hedge; 100% makes your profit identical whether the candidate wins or loses; above
+      100% over-hedges. The price is fair, so the hedge never changes expected profit. It only narrows the gap between
+      the win and lose outcomes.
     </T>
   ),
   gamma: (
@@ -211,29 +213,24 @@ export function FormField({ value, onChange }: { value: EffectForm; onChange: (v
   );
 }
 
-export function FullHedgeToggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
-  const { snapshot, setActive } = useContext(ControlCtx);
+/** Rarely-changed assumptions, collapsed by default. A dot shows when any are off their defaults. */
+export function AdvancedGroup({ modified, children }: { modified: boolean; children: React.ReactNode }) {
   return (
-    <div onPointerEnter={() => setActive("hedge")} onPointerLeave={() => setActive(null)}>
-      <Tip
-        width="w-full min-w-64"
-        content={
-          <T title="Use the full hedge">
-            Sets the hedge to the exact amount that makes your profit identical whether the candidate wins or
-            loses, so all risk is gone. Uncheck it to choose a hedge size yourself.
-          </T>
-        }
-      >
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox" checked={checked}
-            onChange={(e) => { snapshot(); onChange(e.target.checked); }}
-            className="accent-[var(--series-1)]"
-          />
-          Use the full (zero-variance) hedge
-        </label>
-      </Tip>
-    </div>
+    <details className="group/adv rounded-lg border border-grid">
+      <summary className="flex cursor-pointer select-none items-center justify-between px-3 py-2 text-sm text-ink-2 hover:text-ink">
+        <span className="flex items-center gap-2">
+          Advanced assumptions
+          {modified && (
+            <span className="inline-flex items-center gap-1 rounded border border-axis px-1.5 text-[10px] font-medium text-ink-2">
+              <span aria-hidden className="inline-block h-1.5 w-1.5 rounded-full bg-series-2" />
+              changed
+            </span>
+          )}
+        </span>
+        <span aria-hidden className="text-ink-3 transition-transform group-open/adv:rotate-90">›</span>
+      </summary>
+      <div className="space-y-5 border-t border-grid px-3 py-4">{children}</div>
+    </details>
   );
 }
 

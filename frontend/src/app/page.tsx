@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ChartCard from "@/components/ChartCard";
 import {
-  affectedCharts, ControlCtx, ControlPanel, DEFAULT_UI, FormField, FullHedgeToggle, SliderField,
+  AdvancedGroup, affectedCharts, ControlCtx, ControlPanel, DEFAULT_UI, FormField, SliderField,
   type ParamId, type UiState,
 } from "@/components/Controls";
 import Heatmap from "@/components/Heatmap";
@@ -13,11 +13,15 @@ import {
   fetchAnalysis, fetchDonationHeatmap, fetchHedgeValue,
   type Analysis, type DonationHeatmap, type HedgeValueHeatmap, type ScenarioParams,
 } from "@/lib/api";
+import { boostToK, kToBoost } from "@/lib/effect";
+import { isPreset, presetState, PRESETS } from "@/lib/presets";
 import { money, moneyShort, pct, sci } from "@/lib/format";
 
 const FORM_LABEL = { log: "Log", linear: "Linear", saturating: "Saturating" } as const;
 const CAT = ["var(--series-1)", "var(--series-2)", "var(--series-3)"];
 const m0 = (v: number) => `$${(v / 1e6).toFixed(0)}M`;
+/** round to 2 significant figures so a log slider lands on tidy dollar amounts */
+const roundSig = (x: number) => { const mag = 10 ** (Math.floor(Math.log10(x)) - 1); return Math.round(x / mag) * mag; };
 
 /** debounce a value so sliders don't hammer the API */
 function useDebounced<T>(value: T, ms = 150): T {
@@ -50,16 +54,16 @@ export default function Page() {
     () => ({
       payoff_if_win: ui.payoff,
       base_win_prob: ui.baseProb,
-      effect_size: ui.effectSize,
+      effect_size: boostToK(ui.boost, ui.effectForm, ui.effectScale),
       effect_scale: ui.effectScale,
       effect_form: ui.effectForm,
       risk_aversion: ui.gamma / (ui.wealthB * 1e9),
     }),
-    [ui.payoff, ui.baseProb, ui.effectSize, ui.effectScale, ui.effectForm, ui.gamma, ui.wealthB],
+    [ui.payoff, ui.baseProb, ui.boost, ui.effectScale, ui.effectForm, ui.gamma, ui.wealthB],
   );
   const dScenario = useDebounced(scenario);
   const dDonation = useDebounced(ui.donation);
-  const dHedge = useDebounced(ui.fullHedge ? null : ui.hedge);
+  const dHedge = useDebounced(ui.hedgeFrac);
 
   useEffect(() => {
     const ac = new AbortController();
@@ -77,10 +81,14 @@ export default function Page() {
   }, [dScenario]);
 
   const visibleGhost = ghost && data && sig(ghost) !== sig(data) ? ghost : null;
+  const pickPreset = (i: number) => {
+    setGhost(dataRef.current);
+    setUi(presetState(PRESETS[i]));
+  };
   const applyOptimal = () => {
     if (!data) return;
     setGhost(data);
-    set({ donation: data.strategy.optimal_donation, fullHedge: true });
+    set({ donation: data.strategy.optimal_donation, hedgeFrac: 1 });
   };
 
   return (
@@ -97,6 +105,8 @@ export default function Page() {
           </p>
         </header>
 
+        <PresetBar ui={ui} onPick={pickPreset} />
+
         {error && (
           <div role="alert" className="rounded-xl border border-series-2 bg-surface p-4 text-sm text-ink">
             Could not reach the API ({error}). Start it with{" "}
@@ -109,6 +119,30 @@ export default function Page() {
         )}
       </div>
     </ControlCtx.Provider>
+  );
+}
+
+function PresetBar({ ui, onPick }: { ui: UiState; onPick: (i: number) => void }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Scenarios">
+      <span className="mr-1 text-sm text-ink-2">Scenarios</span>
+      {PRESETS.map((p, i) => {
+        const on = isPreset(ui, p);
+        return (
+          <Tip key={p.id} side="bottom" width="w-80" className="inline-block"
+            content={<T title={p.label}>{p.blurb}</T>}>
+            <button
+              onClick={() => onPick(i)} aria-pressed={on}
+              className={`rounded-full border px-3 py-1 text-sm transition-colors ${
+                on ? "border-series-1 bg-series-1 text-white" : "border-axis bg-surface text-ink-2 hover:text-ink"
+              }`}
+            >
+              {p.label}
+            </button>
+          </Tip>
+        );
+      })}
+    </div>
   );
 }
 
@@ -216,7 +250,7 @@ function SummaryBar({
 
 function Section({
   letter, title, question, controls, children,
-}: { letter: string; title: string; question: string; controls: React.ReactNode; children: React.ReactNode }) {
+}: { letter: string; title: string; question: string; controls?: React.ReactNode; children: React.ReactNode }) {
   return (
     <section aria-labelledby={`sec-${letter}`}>
       <div className="mb-3">
@@ -225,10 +259,14 @@ function Section({
         </h2>
         <p className="text-sm text-ink-2">{question}</p>
       </div>
-      <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
-        <ControlPanel>{controls}</ControlPanel>
+      {controls ? (
+        <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
+          <ControlPanel>{controls}</ControlPanel>
+          <div className="grid min-w-0 gap-4 xl:grid-cols-2">{children}</div>
+        </div>
+      ) : (
         <div className="grid min-w-0 gap-4 xl:grid-cols-2">{children}</div>
-      </div>
+      )}
     </section>
   );
 }
@@ -309,14 +347,14 @@ function Sections({
     : [];
 
   const donationSlider = (
-    <SliderField param="donation" label="Donation (D)" value={ui.donation} min={0} max={300e6} step={1e6}
+    <SliderField param="donation" label="Donation (D)" value={ui.donation} min={0} max={500e6} step={1e6}
       display={m0(ui.donation)} onChange={(v) => set({ donation: v })} />
   );
-  const formSelect = <FormField value={ui.effectForm} onChange={(v) => set({ effectForm: v })} />;
-  const scaleSlider = (
-    <SliderField param="effectScale" label="Effect scale (s)" value={ui.effectScale} min={1e6} max={100e6} step={1e6}
-      display={m0(ui.effectScale)} onChange={(v) => set({ effectScale: v })} />
-  );
+  const dflt = DEFAULT_UI;
+  const advancedA = ui.baseProb !== dflt.baseProb || ui.effectForm !== dflt.effectForm || ui.effectScale !== dflt.effectScale;
+  const advancedB = ui.wealthB !== dflt.wealthB;
+  const hedgeDollars = ui.hedgeFrac * st.full_hedge_size;
+  const toPts = (k: number) => kToBoost(k, s.effect_form, s.effect_scale) * 100;
 
   return (
     <>
@@ -326,15 +364,18 @@ function Sections({
         question="How much do donated dollars raise the win probability, and is that worth more than the dollars?"
         controls={
           <>
-            <SliderField param="payoff" label="Payoff if wins (V)" value={ui.payoff} min={20e6} max={500e6} step={5e6}
-              display={m0(ui.payoff)} onChange={(v) => set({ payoff: v })} />
-            <SliderField param="baseProb" label="Win probability, no donation (p₀)" value={ui.baseProb} min={0.05} max={0.95} step={0.01}
-              display={`${(ui.baseProb * 100).toFixed(0)}%`} onChange={(v) => set({ baseProb: v })} />
-            {formSelect}
-            <SliderField param="effectSize" label="Effect size (k)" value={ui.effectSize} min={0} max={0.1} step={0.001}
-              display={ui.effectSize.toFixed(3)} onChange={(v) => set({ effectSize: v })} />
-            {scaleSlider}
+            <SliderField param="payoff" label="Payoff if wins (V)" value={Math.log10(ui.payoff)} min={Math.log10(20e6)} max={10} step={0.01}
+              display={moneyShort(ui.payoff)} onChange={(v) => set({ payoff: roundSig(10 ** v) })} />
+            <SliderField param="boost" label="Boost from a $50M donation" value={ui.boost} min={0} max={0.2} step={0.001}
+              display={`+${(ui.boost * 100).toFixed(1)} pts`} onChange={(v) => set({ boost: v })} />
             {donationSlider}
+            <AdvancedGroup modified={advancedA}>
+              <SliderField param="baseProb" label="Win probability, no donation (p₀)" value={ui.baseProb} min={0.05} max={0.95} step={0.01}
+                display={`${(ui.baseProb * 100).toFixed(0)}%`} onChange={(v) => set({ baseProb: v })} />
+              <FormField value={ui.effectForm} onChange={(v) => set({ effectForm: v })} />
+              <SliderField param="effectScale" label="Effect scale (s)" value={ui.effectScale} min={1e6} max={100e6} step={1e6}
+                display={m0(ui.effectScale)} onChange={(v) => set({ effectScale: v })} />
+            </AdvancedGroup>
           </>
         }>
         <ChartCard n={1} ringed={ringed(1)} title="Donation → win probability"
@@ -369,16 +410,16 @@ function Sections({
         controls={
           <>
             {donationSlider}
-            <FullHedgeToggle checked={ui.fullHedge} onChange={(v) => set({ fullHedge: v })} />
-            <div className={ui.fullHedge ? "opacity-40" : ""}>
-              <SliderField param="hedge" label="Hedge (spend on NO)" value={ui.hedge} min={0} max={200e6} step={1e6}
-                display={m0(ui.hedge)} onChange={(v) => set({ hedge: v, fullHedge: false })} />
-            </div>
+            <SliderField param="hedge" label="Hedge (% of risk-free hedge)" value={ui.hedgeFrac} min={0} max={1.5} step={0.01}
+              display={`${Math.round(ui.hedgeFrac * 100)}%`} readout={`≈ ${moneyShort(hedgeDollars)} bet on NO`}
+              onChange={(v) => set({ hedgeFrac: v })} />
             <SliderField param="gamma" label="Risk aversion (γ)" value={ui.gamma} min={0} max={20} step={0.5}
-              display={ui.gamma === 0 ? "risk-neutral" : ui.gamma.toFixed(1)} onChange={(v) => set({ gamma: v })} />
-            <SliderField param="wealth" label="Donor wealth" value={ui.wealthB} min={0.5} max={100} step={0.5}
-              display={`$${ui.wealthB}B`} onChange={(v) => set({ wealthB: v })}
+              display={ui.gamma === 0 ? "risk-neutral" : ui.gamma.toFixed(1)} onChange={(v) => set({ gamma: v })}
               readout={`a = γ / wealth = ${(ui.gamma / (ui.wealthB * 1e9)).toExponential(1)}`} />
+            <AdvancedGroup modified={advancedB}>
+              <SliderField param="wealth" label="Donor wealth" value={ui.wealthB} min={0.5} max={100} step={0.5}
+                display={`$${ui.wealthB}B`} onChange={(v) => set({ wealthB: v })} />
+            </AdvancedGroup>
           </>
         }>
         <ChartCard n={3} ringed={ringed(3)} title="Hedge size → payoffs"
@@ -408,21 +449,15 @@ function Sections({
       </Section>
 
       <Section letter="C" title="Where does it pay?"
-        question="How the answers change across the whole space of effect sizes, payoffs, risk aversion and donation sizes."
-        controls={
-          <>
-            {formSelect}
-            {scaleSlider}
-          </>
-        }>
+        question="How the answers change across the whole space of donation effects, payoffs, risk aversion and donation sizes.">
         <ChartCard n={5} ringed={ringed(5)} title="When is donating worth it?"
-          takeaway="Optimal donation across effect size and payoff. The lowest shade means the best donation is $0; stronger shades are where money buys enough probability to pay.">
+          takeaway="Optimal donation across how much a $50M donation moves the win probability, and the payoff. The lowest shade means the best donation is $0; stronger shades are where money buys enough probability to pay.">
           {donationMap ? (
             <Heatmap
               ariaLabel="Optimal donation by effect size and payoff"
-              xs={donationMap.payoff} ys={donationMap.effect_size} z={donationMap.optimal_donation}
-              xFormat={moneyShort} yFormat={(v) => v.toFixed(3)} valueFormat={moneyShort}
-              xTitle="Payoff if wins (V)" yTitle="Effect size (k)"
+              xs={donationMap.payoff} ys={donationMap.effect_size} z={donationMap.optimal_donation} xScale="log"
+              xFormat={moneyShort} yFormat={(k) => toPts(k).toFixed(1)} valueFormat={moneyShort}
+              xTitle="Payoff if wins (V)" yTitle="Boost from $50M (pts)"
               marker={{ x: s.payoff_if_win, y: s.effect_size, label: "your scenario" }}
               ghost={ghost ? { x: ghost.scenario.payoff_if_win, y: ghost.scenario.effect_size } : null} />
           ) : <div className="h-[300px] text-sm text-ink-3">Loading…</div>}

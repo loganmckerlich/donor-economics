@@ -79,14 +79,14 @@ async function post<T>(path: string, body: unknown, signal?: AbortSignal): Promi
 export const fetchAnalysis = (
   scenario: ScenarioParams,
   donation: number,
-  hedge: number | null,
+  hedgeFraction: number,
   signal?: AbortSignal,
-) => post<Analysis>("/api/analysis", { scenario, donation, hedge }, signal);
+) => post<Analysis>("/api/analysis", { scenario, donation, hedge_fraction: hedgeFraction }, signal);
 
 export const fetchDonationHeatmap = (scenario: ScenarioParams, signal?: AbortSignal) =>
   post<DonationHeatmap>(
     "/api/sweep/donation-heatmap",
-    { scenario, effect_size_range: [0, 0.1], payoff_range: [20e6, 500e6], n: 25 },
+    { scenario, effect_size_range: [0, 0.1], payoff_range: [20e6, 10e9], n: 25 },
     signal,
   );
 

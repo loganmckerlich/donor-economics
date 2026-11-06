@@ -30,6 +30,13 @@ def test_null_hedge_means_full_hedge():
     assert abs(j["hedge"] - j["strategy"]["full_hedge_size"]) < 1
 
 
+def test_hedge_fraction_scales_the_full_hedge():
+    j = c.post("/api/analysis", json={"hedge_fraction": 0.5}).json()
+    assert abs(j["hedge"] - 0.5 * j["strategy"]["full_hedge_size"]) < 1
+    j = c.post("/api/analysis", json={"hedge_fraction": 1.0, "hedge": 3e6}).json()  # fraction wins
+    assert abs(j["hedge"] - j["strategy"]["full_hedge_size"]) < 1
+
+
 def test_validation_rejects_bad_input():
     assert c.post("/api/analysis", json={"scenario": {"base_win_prob": 1.5}}).status_code == 422
 

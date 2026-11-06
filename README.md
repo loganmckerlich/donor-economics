@@ -73,11 +73,13 @@ cd frontend && npm install && npm run dev
 
 Set `BACKEND_URL` if the API is not on `http://127.0.0.1:8000`. API tests: `cd backend && ../.venv/bin/pytest`.
 
-The Explorer page is organised in three sections, each with its own sliders beside the charts they drive:
+A row of **scenario presets** sits above the sections: the realistic default ("Literature-sized effect", where the best donation is $0), plus four regimes where donating pays: a billion-dollar policy stake, an open-seat primary, early money, and a true believer. Donating only pays when the first dollar returns more than a dollar, i.e. when V * k / s > 1; at the default effect that needs a payoff of roughly $660M. Switching presets leaves the previous curves as dotted "before" lines. In the big-stake presets the risk-free hedge can be billions of dollars, far beyond what a prediction market could absorb; that friction is deliberately outside the model.
 
-- **A. Does the donation pay?** Payoff, base win probability, donation-effect form, size and scale, and the donation. Charts 1 (win probability) and 2 (EV of donating vs not).
-- **B. How should the donor hedge?** Donation, hedge size (or the full hedge), risk aversion and wealth. Charts 3 (payoffs vs hedge size) and 4 (value of hedging).
-- **C. Where does it pay?** Heatmaps of the optimal donation (effect size x payoff) and of the value of hedging (risk aversion x donation). Charts 5 and 6.
+The Explorer page is organised in three sections. Each section has its own sliders beside the charts they drive. Five controls are always visible: payoff, the win-probability boost a $50M donation buys, the donation, the hedge (as a percentage of the risk-free hedge) and risk aversion. Rarely-changed assumptions (base win probability, functional form, effect scale, donor wealth) are in collapsed "Advanced assumptions" groups, with a "changed" badge when any is off its default. The boost is the anchor: `k` is derived from it, so changing the form or scale reshapes the curve without changing the boost at $50M.
+
+- **A. Does the donation pay?** Charts 1 (win probability) and 2 (EV of donating vs not).
+- **B. How should the donor hedge?** Charts 3 (payoffs vs hedge size) and 4 (value of hedging).
+- **C. Where does it pay?** Heatmaps of the optimal donation (boost x payoff) and of the value of hedging (risk aversion x donation). Charts 5 and 6.
 
 Hover any control (or focus it with the keyboard) for a plain-language explanation of what it is and does. Each slider carries numbered chips for the charts it changes: hovering a chip says whether the control reshapes that chart or only moves your marker, and hovering or focusing the slider outlines those charts. Hover any headline number in the top bar for what it means. When you move a slider, the previous curves stay behind as faint dotted "before" lines (and a dashed ring on the heatmaps) until the next change or "Clear before lines". A sticky bar at the top keeps the headline numbers and the "Apply optimal strategy" button in view.
 

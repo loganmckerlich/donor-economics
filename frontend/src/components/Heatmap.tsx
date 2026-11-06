@@ -12,6 +12,7 @@ interface Props {
   valueFormat: (v: number) => string;
   xTitle: string;
   yTitle: string;
+  xScale?: "linear" | "log";
   yScale?: "linear" | "log";
   marker?: { x: number; y: number; label: string };
   /** where the marker was before the last change */
@@ -31,7 +32,7 @@ function fracIndex(grid: number[], v: number, log = false): number {
 }
 
 export default function Heatmap({
-  xs, ys, z, xFormat, yFormat, valueFormat, xTitle, yTitle, yScale = "linear", marker, ghost, ariaLabel, height = 300,
+  xs, ys, z, xFormat, yFormat, valueFormat, xTitle, yTitle, xScale = "linear", yScale = "linear", marker, ghost, ariaLabel, height = 300,
 }: Props) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<[number, number] | null>(null);
@@ -49,10 +50,10 @@ export default function Heatmap({
   const tickCols = xs.map((_, i) => i).filter((i) => i % Math.ceil(xs.length / (width < 480 ? 3 : 5)) === 0);
   const tickRows = ys.map((_, i) => i).filter((i) => i % Math.ceil(ys.length / 5) === 0);
 
-  const mx = marker ? M.l + (fracIndex(xs, marker.x) + 0.5) * cw : 0;
+  const mx = marker ? M.l + (fracIndex(xs, marker.x, xScale === "log") + 0.5) * cw : 0;
   const my = marker ? M.t + ih - (fracIndex(ys, marker.y, yScale === "log") + 0.5) * ch : 0;
 
-  const gx = ghost ? M.l + (fracIndex(xs, ghost.x) + 0.5) * cw : 0;
+  const gx = ghost ? M.l + (fracIndex(xs, ghost.x, xScale === "log") + 0.5) * cw : 0;
   const gy = ghost ? M.t + ih - (fracIndex(ys, ghost.y, yScale === "log") + 0.5) * ch : 0;
 
   return (

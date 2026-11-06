@@ -18,7 +18,7 @@ from donor_economics import (
 # a ~ gamma / wealth: 4e-10 = gamma 2 on $5B, 2e-9 = gamma 10 on $5B, 1e-8 = stress case.
 REFERENCE_A = (4e-10, 2e-9, 1e-8)
 FORMS = ("log", "linear", "saturating")
-MAX_DONATION = 500e6
+MAX_DONATION = 1e9
 
 
 def _clean(x):
@@ -34,9 +34,14 @@ def _clean(x):
     return x
 
 
-def analysis(s: Scenario, donation: float, hedge: float | None) -> dict:
+def analysis(
+    s: Scenario, donation: float, hedge: float | None, hedge_fraction: float | None = None
+) -> dict:
     h_full = full_hedge_size(s, donation)
-    h = h_full if hedge is None else hedge
+    if hedge_fraction is not None:
+        h = hedge_fraction * h_full
+    else:
+        h = h_full if hedge is None else hedge
     d_star = optimal_donation(s, MAX_DONATION, 2001)
     h_star = optimal_hedge(s, d_star)
 
@@ -109,9 +114,9 @@ def donation_heatmap(
 ) -> dict:
     """Optimal donation over (effect size k) x (payoff V)."""
     ks = np.linspace(*k_range, n)
-    vs = np.linspace(*v_range, n)
+    vs = np.geomspace(*v_range, n)  # payoffs span orders of magnitude, so space them geometrically
     z = [
-        [optimal_donation(replace(s, effect_size=float(k), payoff_if_win=float(v)), MAX_DONATION, 1001)
+        [optimal_donation(replace(s, effect_size=float(k), payoff_if_win=float(v)), MAX_DONATION, 1501)
          for v in vs]
         for k in ks
     ]
