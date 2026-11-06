@@ -3,7 +3,7 @@ name = "donor-economics"
 version = "0.1.0"
 description = "Is it economically viable for a political donor to hedge on a prediction market?"
 requires-python = ">=3.11"
-dependencies = ["numpy"]
+dependencies = ["numpy", "fastapi>=0.115"]  # fastapi is needed by the API entrypoint (api/index.py) on Vercel
 
 [project.optional-dependencies]
 dev = ["pytest"]
