@@ -100,15 +100,15 @@ python3 -m venv .venv
 - `full_hedge_size`, `optimal_hedge`: closed-form hedge sizes.
 - `donation_ev`, `optimal_donation`: the donation decision, relative to not donating.
 
-Example, with the default `Scenario` (V=$100M, p0=0.45, k=0.015, s=$10M), `D=$50M`, so p(D)=0.477:
+Example, with the default `Scenario` (V=$100M, p0=0.50, k=0.015, s=$10M), `D=$50M`, so p(D)=0.527:
 
 | Hedge | Win | Lose | EV | Std dev |
 |---|---|---|---|---|
-| None | +$50.0M | -$50.0M | -$2.3M | $49.9M |
-| $25M | +$25.0M | -$27.2M | -$2.3M | $26.1M |
-| $52.3M (full) | -$2.3M | -$2.3M | -$2.3M | $0 |
+| None | +$50.0M | -$50.0M | +$2.7M | $49.9M |
+| $25M | +$25.0M | -$22.1M | +$2.7M | $23.5M |
+| $47.3M (full) | +$2.7M | +$2.7M | +$2.7M | $0 |
 
-Here `EV` is the donor's payoff `p(D) * V - D`, which is -$2.3M. Relative to not donating at all it is -$47.3M, because the baseline `p0 * V` is $45M, and the optimal donation is $0. The default `k` is a placeholder chosen to give about +2.7 points at $50M, in line with the literature's "a few points at best" (unverified, see the evidence note).
+Here `EV` is the donor's payoff `p(D) * V - D`, which is +$2.7M. Relative to not donating at all it is -$47.3M, because the baseline `p0 * V` is $50M, and the optimal donation is $0. The default `k` is a placeholder chosen to give about +2.7 points at $50M, in line with the literature's "a few points at best" (unverified, see the evidence note).
 
 ### Calibrating risk aversion
 

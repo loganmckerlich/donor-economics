@@ -23,7 +23,7 @@ export const DEFAULT_UI: UiState = {
   donation: 50e6,
   hedgeFrac: 0.5,
   gamma: 2,
-  baseProb: 0.45,
+  baseProb: 0.5,
   effectForm: "log",
   effectScale: 10e6,
   wealthB: 5,

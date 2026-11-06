@@ -26,7 +26,7 @@ P_CAP = 0.999  # keep prices strictly inside (0, 1)
 @dataclass(frozen=True)
 class Scenario:
     payoff_if_win: float = 100e6  # V
-    base_win_prob: float = 0.45  # p0: P(A wins) with no donation
+    base_win_prob: float = 0.50  # p0: P(A wins) with no donation
     effect_size: float = 0.015  # k: prob. per unit of ln(1+D/s); ~+2.7pts at $50M (unverified)
     effect_scale: float = 10e6  # s: donation scale of the curve ($)
     effect_form: str = "log"  # "log" | "linear" | "saturating"

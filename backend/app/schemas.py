@@ -7,7 +7,7 @@ from donor_economics import Scenario
 
 class ScenarioIn(BaseModel):
     payoff_if_win: float = Field(100e6, gt=0, le=1e12)
-    base_win_prob: float = Field(0.45, gt=0, lt=0.99)
+    base_win_prob: float = Field(0.50, gt=0, lt=0.99)
     effect_size: float = Field(0.015, ge=0, le=1)
     effect_scale: float = Field(10e6, gt=0, le=1e11)
     effect_form: Literal["log", "linear", "saturating"] = "log"

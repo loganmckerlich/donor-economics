@@ -13,8 +13,8 @@ The market is efficient and reprices for the donation, so the YES price is `m = 
 - A wins: `V - D - H`
 - A loses: `-D + H*m/(1 - m)`
 
-Zero-variance (full) hedge: set `V - H = H*m/(1-m)`, which gives `H* = V*(1 - m)` (`full_hedge_size`). With `m = 0.55` and `V = $100M`, `H* = $45M`. At the default scenario and `D = $50M`, `m = 0.4769` and `H* = $52.3M`, which is more than the donation. Both outcomes then pay `m*V - D` (here -$2.3M).
-- Std of the hedged payoff falls linearly in the hedge fraction: a partial hedge of fraction `h = H/H*` leaves std `(1-h)` times the unhedged std (default: $49.9M unhedged, $26.1M at `H = $25M`, $0 at full).
+Zero-variance (full) hedge: set `V - H = H*m/(1-m)`, which gives `H* = V*(1 - m)` (`full_hedge_size`). With `m = 0.55` and `V = $100M`, `H* = $45M`. At the default scenario and `D = $50M`, `m = 0.527` and `H* = $47.3M`, a little less than the donation. Both outcomes then pay `m*V - D` (here +$2.7M).
+- Std of the hedged payoff falls linearly in the hedge fraction: a partial hedge of fraction `h = H/H*` leaves std `(1-h)` times the unhedged std (default: $49.9M unhedged, $23.5M at `H = $25M`, $0 at full).
 - Because the hedge is priced fairly (`1 - m` equals the true chance of A losing) and the model has no frictions, **EV is identical for every `H`**. A risk-neutral donor is indifferent; any risk-averse donor (`a > 0`) maximises CE at `H*` (`optimal_hedge`), for every `a`. How much it is worth depends on `a`: with `a = 4e-10` (about `gamma = 2`, wealth $5B) the CE gain from fully hedging the default $50M donation is only about $0.5M.
 
 ## Cost of hedging (outside the current model's scope)
