@@ -11,6 +11,8 @@ This is a theory exercise. Real-world frictions are deliberately set aside (see 
 
 ## Modeling assumptions
 
+The app shows these in a collapsible "Model assumptions" panel with a worked example for each (`frontend/src/lib/assumptions.ts`; keep the two in sync).
+
 ### Structure
 1. **Static, one-shot.** The donor donates, hedges once, and the election resolves. No dynamic rebalancing.
 2. **Binary market.** A single binary contract: A wins / A loses. No multi-candidate or primary-vs-general structure.
@@ -18,7 +20,7 @@ This is a theory exercise. Real-world frictions are deliberately set aside (see 
 
 ### The donor
 4. **Unlimited capital, motivated only by money.** The donor can always fund both the donation and the hedge, and only cares about making more money.
-5. **Risk aversion is a parameter.** Default is risk-neutral (`a = 0`). Because the donor has effectively unlimited wealth, I propose absolute risk aversion (CARA, `u(x) = -exp(-a x)`) over CRRA, since it does not depend on a wealth level. Sweeping `a` shows how risk-averse a donor must be for hedging to pay.
+5. **Risk aversion is a parameter.** The app starts at gamma = 2 on $5B of wealth (a = 4e-10); gamma = 0 is risk-neutral. It uses absolute risk aversion (CARA, `u(x) = -exp(-a x)`) with `a = gamma / wealth`, so wealth only enters through that conversion. Sweeping it shows how risk-averse a donor must be for hedging to pay.
 6. **No private information**, other than the fact that they are donating (see 8).
 
 ### Donation effect on the election

@@ -90,7 +90,7 @@ export default function GlossaryApp() {
           Could not load the knowledgebase ({error}). Is the API running on port 8000?
         </div>
       )}
-      <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[280px_minmax(0,1fr)]">
         <nav aria-label="Knowledgebase" className="lg:sticky lg:top-4 lg:self-start">
           <ul className="space-y-1 rounded-xl border border-grid bg-surface p-2">
             {nav.map((n) => (

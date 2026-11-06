@@ -37,12 +37,15 @@ interface Props {
   height?: number;
 }
 
-const M = { l: 58, r: 112, t: 22, b: 40 };
+const margins = (width: number) =>
+  width < 520 ? { l: 48, r: 14, t: 22, b: 40 } : { l: 58, r: 112, t: 22, b: 40 };
 
 export default function LineChart({
   x, series, xFormat, yFormat, xTitle, yTitle, vlines = [], zeroLine, yDomain, ariaLabel, height = 300,
 }: Props) {
   const [ref, width] = useWidth<HTMLDivElement>();
+  const compact = width < 520;
+  const M = margins(width);
   const [hover, setHover] = useState<number | null>(null);
   const clipId = useId();
   const live = series.filter((s) => !s.ghost);
@@ -149,7 +152,7 @@ export default function LineChart({
               strokeLinejoin="round" strokeLinecap="round" strokeDasharray={s.dashed ? "6 4" : undefined} />
           ))}
 
-          {labels.map(({ s, y }) => (
+          {!compact && labels.map(({ s, y }) => (
             <g key={s.key}>
               <rect x={M.l + iw + 8} y={y - 5} width={10} height={3} rx={1.5} fill={s.color} />
               <text x={M.l + iw + 22} y={y} dy="0.32em" fontSize={11} fill="var(--ink-2)">{s.label}</text>
@@ -183,6 +186,17 @@ export default function LineChart({
           </div>
         )}
       </div>
+
+      {compact && live.length > 1 && (
+        <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink-2">
+          {live.map((s) => (
+            <span key={s.key} className="inline-flex items-center gap-1.5">
+              <span className="inline-block h-[3px] w-3 rounded-sm" style={{ background: s.color }} />
+              {s.label}
+            </span>
+          ))}
+        </div>
+      )}
 
       <details className="mt-1 text-xs text-ink-3">
         <summary className="cursor-pointer select-none">View data</summary>

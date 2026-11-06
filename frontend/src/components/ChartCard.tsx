@@ -4,7 +4,7 @@ export default function ChartCard({
   return (
     <section
       id={`chart-${n}`}
-      className={`rounded-xl border bg-surface p-4 transition-shadow ${
+      className={`min-w-0 rounded-xl border bg-surface p-4 transition-shadow ${
         ringed ? "border-series-1 shadow-[0_0_0_2px_var(--series-1)]" : "border-grid"
       }`}
     >

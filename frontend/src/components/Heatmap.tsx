@@ -113,7 +113,7 @@ export default function Heatmap({
         )}
       </div>
 
-      <div className="mt-1 flex items-center gap-2 text-xs text-ink-3">
+      <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-3">
         <span>{valueFormat(0)}</span>
         <div className="flex">
           {Array.from({ length: BINS }, (_, i) => (

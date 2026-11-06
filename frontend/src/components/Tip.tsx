@@ -13,7 +13,11 @@ interface Props {
   focusable?: boolean;
 }
 
-/** CSS-driven tooltip: opens on hover or keyboard focus (not after a mouse click), hides while the pointer is pressed (e.g. dragging a slider). */
+/**
+ * CSS-driven tooltip: opens on hover or keyboard focus (not after a mouse click) and hides while the
+ * pointer is pressed (e.g. dragging a slider). Hidden means display:none so it never adds scrollable
+ * width. On phones it shows as a bottom sheet so it cannot run off-screen.
+ */
 export default function Tip({
   content, children, side = "top", align = "left", width = "w-72", className = "", focusable = false,
 }: Props) {
@@ -28,9 +32,9 @@ export default function Tip({
       <span
         id={id}
         role="tooltip"
-        className={`pointer-events-none invisible absolute z-50 max-w-[calc(100vw-2rem)] ${width} ${
+        className={`pointer-events-none absolute z-50 hidden ${width} ${
           side === "top" ? "bottom-full mb-1.5" : "top-full mt-1.5"
-        } ${align === "left" ? "left-0" : "right-0"} rounded-lg border border-axis bg-surface px-3 py-2 text-left text-xs font-normal normal-case leading-relaxed tracking-normal text-ink-2 opacity-0 shadow-lg transition-opacity duration-100 group-hover/tip:visible group-hover/tip:opacity-100 group-focus-visible/tip:visible group-focus-visible/tip:opacity-100 group-has-[:focus-visible]/tip:visible group-has-[:focus-visible]/tip:opacity-100 group-active/tip:invisible group-active/tip:opacity-0`}
+        } ${align === "left" ? "left-0" : "right-0"} rounded-lg border border-axis bg-surface px-3 py-2 text-left text-xs font-normal normal-case leading-relaxed tracking-normal text-ink-2 shadow-lg max-sm:fixed max-sm:inset-x-4 max-sm:bottom-4 max-sm:top-auto max-sm:mb-0 max-sm:mt-0 max-sm:w-auto max-sm:min-w-0 group-hover/tip:block group-focus-visible/tip:block group-has-[:focus-visible]/tip:block group-active/tip:hidden`}
       >
         {content}
       </span>

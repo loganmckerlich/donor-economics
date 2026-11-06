@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import AssumptionsPanel from "@/components/AssumptionsPanel";
 import ChartCard from "@/components/ChartCard";
 import {
   AdvancedGroup, affectedCharts, ControlCtx, ControlPanel, DEFAULT_UI, FormField, SliderField,
@@ -105,6 +106,8 @@ export default function Page() {
           </p>
         </header>
 
+        <AssumptionsPanel />
+
         <PresetBar ui={ui} onPick={pickPreset} />
 
         {error && (
@@ -151,7 +154,7 @@ function Mini({
 }: { label: string; value: string; sub?: string; tip: React.ReactNode; align?: "left" | "right" }) {
   return (
     <Tip content={tip} side="bottom" align={align} width="w-80" focusable className="min-w-0 cursor-help">
-      <div className="truncate text-[11px] font-medium uppercase tracking-wide text-ink-3 underline decoration-dotted decoration-ink-3/50 underline-offset-4">
+      <div className="text-[11px] font-medium uppercase tracking-wide text-ink-3 sm:truncate underline decoration-dotted decoration-ink-3/50 underline-offset-4">
         {label}
       </div>
       <div className="truncate text-lg font-semibold tabular-nums text-ink">{value}</div>
@@ -166,7 +169,7 @@ function SummaryBar({
   const st = d?.strategy;
   const a = d?.scenario.risk_aversion ?? 0;
   return (
-    <div className="z-20 border-b border-grid bg-surface/95 backdrop-blur sm:sticky sm:top-0">
+    <div className="z-20 border-b border-grid bg-surface/95 sm:sticky sm:top-0 sm:backdrop-blur">
       <div className="mx-auto grid max-w-[1400px] grid-cols-2 items-start gap-x-6 gap-y-3 px-4 py-2.5 sm:px-6 lg:grid-cols-[repeat(4,minmax(0,1fr))_auto]">
         <Mini
           label="Best donation"
@@ -182,6 +185,7 @@ function SummaryBar({
         />
         <Mini
           label="Expected gain from your donation"
+          align="right"
           value={st ? money(st.donation_ev) : "…"}
           sub={d ? `vs not donating. Win chance ${pct(d.scenario.base_win_prob)} → ${pct(d.outcome.p_win)}` : undefined}
           tip={
@@ -260,12 +264,12 @@ function Section({
         <p className="text-sm text-ink-2">{question}</p>
       </div>
       {controls ? (
-        <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
           <ControlPanel>{controls}</ControlPanel>
-          <div className="grid min-w-0 gap-4 xl:grid-cols-2">{children}</div>
+          <div className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-2">{children}</div>
         </div>
       ) : (
-        <div className="grid min-w-0 gap-4 xl:grid-cols-2">{children}</div>
+        <div className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-2">{children}</div>
       )}
     </section>
   );
