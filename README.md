@@ -58,6 +58,23 @@ A quick, secondary-source-only search (search summaries, not the primary papers)
 
 **Status:** unverified beyond search summaries. Check the primary sources before citing.
 
+## Running the app
+
+Two processes: a FastAPI backend (wraps the Python model) and a Next.js + Tailwind frontend that proxies `/api/*` to it.
+
+```
+# terminal 1: API on :8000
+cd backend && ../.venv/bin/pip install -r requirements.txt
+../.venv/bin/uvicorn app.main:app --port 8000
+
+# terminal 2: UI on :3000
+cd frontend && npm install && npm run dev
+```
+
+Set `BACKEND_URL` if the API is not on `http://127.0.0.1:8000`. API tests: `cd backend && ../.venv/bin/pytest`.
+
+The dashboard has sliders for every model parameter, summary cards for the optimal strategy, and six charts: win probability vs donation (three functional forms), EV of donating vs not donating, payoffs vs hedge size, hedge value vs hedge size at three risk-aversion levels, a heatmap of the optimal donation over effect size and payoff, and a heatmap of the value of hedging over risk aversion and donation. "Apply optimal strategy" jumps to the best donation and a full hedge.
+
 ## Setup
 
 ```

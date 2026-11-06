@@ -1,6 +1,7 @@
 from .model import (
     Scenario,
     Outcome,
+    certainty_equivalent,
     evaluate,
     full_hedge_size,
     optimal_hedge,
@@ -11,6 +12,7 @@ from .model import (
 __all__ = [
     "Scenario",
     "Outcome",
+    "certainty_equivalent",
     "evaluate",
     "full_hedge_size",
     "optimal_hedge",

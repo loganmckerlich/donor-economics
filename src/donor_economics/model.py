@@ -32,17 +32,19 @@ class Scenario:
     effect_form: str = "log"  # "log" | "linear" | "saturating"
     risk_aversion: float = 0.0  # a: CARA coefficient (per $); 0 = risk-neutral
 
-    def win_prob(self, donation: float) -> float:
-        x = donation / self.effect_scale
+    def win_prob(self, donation):
+        """P(A wins) given donation(s). Accepts a float or a numpy array."""
+        x = np.asarray(donation, dtype=float) / self.effect_scale
         if self.effect_form == "log":
-            lift = self.effect_size * math.log1p(x)
+            lift = self.effect_size * np.log1p(x)
         elif self.effect_form == "linear":
             lift = self.effect_size * x
         elif self.effect_form == "saturating":
-            lift = self.effect_size * (1 - math.exp(-x))
+            lift = self.effect_size * (1 - np.exp(-x))
         else:
             raise ValueError(f"unknown effect_form {self.effect_form!r}")
-        return min(self.base_win_prob + lift, P_CAP)
+        out = np.minimum(self.base_win_prob + lift, P_CAP)
+        return float(out) if out.ndim == 0 else out
 
     def market_price(self, donation: float) -> float:
         """YES price. Efficient market that has priced in the donation."""
@@ -100,7 +102,7 @@ def optimal_hedge(s: Scenario, donation: float) -> float:
     return 0.0 if s.risk_aversion == 0 else full_hedge_size(s, donation)
 
 
-def donation_ev(s: Scenario, donation: float) -> float:
+def donation_ev(s: Scenario, donation):
     """EV of donating ``donation`` relative to not donating at all (hedge-independent)."""
     return (s.win_prob(donation) - s.win_prob(0)) * s.payoff_if_win - donation
 
@@ -109,4 +111,4 @@ def optimal_donation(s: Scenario, max_donation: float = 500e6, n: int = 5001) ->
     """Donation maximising EV gain over no donation (grid search). The fair hedge only
     removes variance, so it does not change this."""
     grid = np.linspace(0, max_donation, n)
-    return float(grid[int(np.argmax([donation_ev(s, d) for d in grid]))])
+    return float(grid[int(np.argmax(donation_ev(s, grid)))])

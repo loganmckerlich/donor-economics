@@ -1,0 +1,139 @@
+"""Chart data builders. Thin layer over ``donor_economics``; all money in dollars."""
+
+from dataclasses import asdict, replace
+
+import numpy as np
+
+from donor_economics import (
+    Scenario,
+    certainty_equivalent,
+    donation_ev,
+    evaluate,
+    full_hedge_size,
+    optimal_donation,
+    optimal_hedge,
+)
+
+# Reference risk aversions for the "CE gain vs hedge size" chart (CARA a, 1/$).
+# a ~ gamma / wealth: 4e-10 = gamma 2 on $5B, 2e-9 = gamma 10 on $5B, 1e-8 = stress case.
+REFERENCE_A = (4e-10, 2e-9, 1e-8)
+FORMS = ("log", "linear", "saturating")
+MAX_DONATION = 500e6
+
+
+def _clean(x):
+    """Recursively turn numpy scalars/arrays into JSON-safe python."""
+    if isinstance(x, dict):
+        return {k: _clean(v) for k, v in x.items()}
+    if isinstance(x, (list, tuple)):
+        return [_clean(v) for v in x]
+    if isinstance(x, np.ndarray):
+        return x.tolist()
+    if isinstance(x, np.generic):
+        return x.item()
+    return x
+
+
+def analysis(s: Scenario, donation: float, hedge: float | None) -> dict:
+    h_full = full_hedge_size(s, donation)
+    h = h_full if hedge is None else hedge
+    d_star = optimal_donation(s, MAX_DONATION, 2001)
+    h_star = optimal_hedge(s, d_star)
+
+    chosen = evaluate(s, donation, h)
+    unhedged = evaluate(s, donation, 0.0)
+    full = evaluate(s, donation, h_full)
+    d_max = max(2.5 * max(donation, d_star), 100e6)
+    d_grid = np.linspace(0, min(d_max, MAX_DONATION), 101)
+
+    # Win probability vs donation, for each functional form (same k and s).
+    win_prob = {
+        "donation": d_grid,
+        **{f: replace(s, effect_form=f).win_prob(d_grid) for f in FORMS},
+    }
+
+    # Donation EV relative to not donating.
+    ev_curve = {"donation": d_grid, "ev": donation_ev(s, d_grid)}
+
+    # Hedge sweep at the chosen donation.
+    h_grid = np.linspace(0, 1.5 * h_full, 121)
+    rows = [evaluate(s, donation, x) for x in h_grid]
+    ce0 = unhedged.certainty_equivalent
+    ref = [
+        {
+            "a": a,
+            "values": [
+                certainty_equivalent(r.p_win, r.pnl_win, r.pnl_lose, a)
+                - certainty_equivalent(unhedged.p_win, unhedged.pnl_win, unhedged.pnl_lose, a)
+                for r in rows
+            ],
+        }
+        for a in REFERENCE_A
+    ]
+    hedge_curve = {
+        "hedge": h_grid,
+        "pnl_win": [r.pnl_win for r in rows],
+        "pnl_lose": [r.pnl_lose for r in rows],
+        "ev": [r.ev for r in rows],
+        "std": [r.std for r in rows],
+        "ce_gain": [r.certainty_equivalent - ce0 for r in rows],  # at the chosen a
+        "ce_gain_by_a": ref,
+    }
+
+    return _clean(
+        {
+            "scenario": asdict(s),
+            "donation": donation,
+            "hedge": h,
+            "market_price": s.market_price(donation),
+            "outcome": asdict(chosen),
+            "unhedged": asdict(unhedged),
+            "fully_hedged": asdict(full),
+            "strategy": {
+                "optimal_donation": d_star,
+                "optimal_donation_ev": float(donation_ev(s, d_star)),
+                "optimal_hedge": h_star,
+                "full_hedge_size": h_full,
+                "donation_ev": float(donation_ev(s, donation)),
+                "donation_worthwhile": bool(donation_ev(s, donation) > 0),
+                "ce_gain_from_full_hedge": full.certainty_equivalent - ce0,
+                "locked_in_pnl": full.pnl_win,
+            },
+            "curves": {"win_prob": win_prob, "donation_ev": ev_curve, "hedge": hedge_curve},
+        }
+    )
+
+
+def donation_heatmap(
+    s: Scenario, k_range: tuple[float, float], v_range: tuple[float, float], n: int
+) -> dict:
+    """Optimal donation over (effect size k) x (payoff V)."""
+    ks = np.linspace(*k_range, n)
+    vs = np.linspace(*v_range, n)
+    z = [
+        [optimal_donation(replace(s, effect_size=float(k), payoff_if_win=float(v)), MAX_DONATION, 1001)
+         for v in vs]
+        for k in ks
+    ]
+    return _clean({"effect_size": ks, "payoff": vs, "optimal_donation": z})
+
+
+def hedge_value_heatmap(
+    s: Scenario, a_range: tuple[float, float], d_range: tuple[float, float], n: int
+) -> dict:
+    """Certainty-equivalent gain ($) from the full hedge over (risk aversion a) x (donation D)."""
+    a_grid = np.geomspace(*a_range, n)
+    d_grid = np.linspace(*d_range, n)
+    z = []
+    for a in a_grid:
+        row = []
+        for d in d_grid:
+            p = s.win_prob(d)
+            h = full_hedge_size(s, d)
+            win0, lose0 = s.payoff_if_win - d, -d
+            wh, lh = win0 - h, -d + h * s.market_price(d) / (1 - s.market_price(d))
+            row.append(
+                certainty_equivalent(p, wh, lh, float(a)) - certainty_equivalent(p, win0, lose0, float(a))
+            )
+        z.append(row)
+    return _clean({"risk_aversion": a_grid, "donation": d_grid, "ce_gain": z})
