@@ -7,7 +7,7 @@ import type { AssumptionsContent } from "@/components/AssumptionsPanel";
  */
 export const ASSUMPTIONS_CONTENT: AssumptionsContent = {
   note:
-    "Examples use the default scenario: a $10M donation, $100M of YES bought at 50%, a $100M payoff if the candidate wins, a 2.7-point boost from $50M (about 1 point from $10M), and a price that captures all of that boost. The capture share is an illustrative placeholder, not measured from real markets: treat the results as showing how the pieces interact, not as a forecast.",
+    "Examples use the Literature-sized effect scenario (a preset; the page opens on a friendlier one): a $10M donation, $100M of YES bought at 50%, a $100M payoff if the candidate wins, a 2.7-point boost from $50M (about 1 point from $10M), and a price that captures all of that boost. The capture share is an illustrative placeholder, not measured from real markets: treat the results as showing how the pieces interact, not as a forecast.",
   assumptions: [
     {
       title: "One buy, one sell, before the election",
@@ -32,9 +32,9 @@ export const ASSUMPTIONS_CONTENT: AssumptionsContent = {
     {
       title: "The price captures a set share of the boost",
       statement:
-        "By the time the donor sells, the price has moved a fixed share of the way to the true win probability. 100% means it has fully caught up, 50% half, 0% means the market ignored the donation, and above 100% means it over-reacted. This one number stands in for both how much the market believes the donation and how long the donor waits.",
+        "By the time the donor sells, the price has moved a fixed share of the way to the true win probability. 100% means it has fully caught up, 50% half, 0% means the market ignored the donation, above 100% means it over-reacted, and below 0% means the price fell back. This one number stands in for both how much the market believes the donation and how long the donor waits.",
       example:
-        "At 100% the price goes from 50% to 51.0%. At 50% it goes to 50.5%. At 0% it stays at 50%, and the trade earns nothing.",
+        "At 100% the price goes from 50% to 51.0%. At 50% it goes to 50.5%. At 0% it stays at 50%, and the trade earns nothing. At −50% it falls to 49.5% and the trade loses money.",
     },
     {
       title: "Nothing else moves the price",
@@ -135,7 +135,7 @@ export const ASSUMPTIONS_CONTENT: AssumptionsContent = {
       result: "The trade only profits if the price follows the donation",
       rests: "Assumptions 3 and 4: the donor buys first, and the price captures a share of the boost.",
       breaks:
-        "If traders anticipate the donation, or the market ignores it (capture 0%), the trade earns nothing and the worst case is the donation itself.",
+        "If traders anticipate the donation, or the market ignores it (capture 0%), the trade earns nothing and the result is the donation alone. If the price falls back instead, the trade loses money too.",
     },
     {
       result: "The trade profit is the same if the candidate wins or loses",

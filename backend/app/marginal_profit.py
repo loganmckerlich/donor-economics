@@ -21,6 +21,7 @@ from .util import clean
 MAX_DONATION = 200e6  # matches the UI slider ranges; beyond these the model is extrapolating
 MAX_CAPITAL = 1e9
 MAX_CAPTURE = 2.0
+MIN_CAPTURE = -1.0  # the price can fall after the donation: the cushion then loses money
 # Three fixed market responses, shown side by side so the risk is about the market, not the election.
 RESPONSES = ((0.0, "Ignores the donation"), (0.5, "Prices half of it"), (1.0, "Prices all of it"))
 
@@ -62,7 +63,7 @@ def marginal_analysis(m: MarginalProfitScenario, n_heat: int = 21) -> dict:
         "ev": [r.ev for r in d_rows],
     }
 
-    c_grid = np.linspace(0, MAX_CAPTURE, 41)
+    c_grid = np.linspace(MIN_CAPTURE, MAX_CAPTURE, 61)
     c_rows = [evaluate(replace(m, capture=float(c))) for c in c_grid]
     capture_curve = {
         "capture": c_grid,
@@ -130,7 +131,7 @@ class MarginalIn(BaseModel):
     effect_form: Literal["log", "linear", "saturating"] = "log"
     donation: float = Field(10e6, ge=0, le=1e10)
     capital: float = Field(100e6, ge=0, le=1e10)  # $ spent buying YES
-    capture: float = Field(1.0, ge=0, le=3)  # share of the true boost the price captures by the sale
+    capture: float = Field(1.0, ge=-1, le=3)  # share of the true boost the price captures by the sale
 
     def to_model(self) -> MarginalProfitScenario:
         return MarginalProfitScenario(**self.model_dump())

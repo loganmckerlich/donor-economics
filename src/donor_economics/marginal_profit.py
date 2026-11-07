@@ -16,7 +16,7 @@ Assumptions (see README.md), in the same spirit as the Full Hedge model:
     the position is sold before the election.
   * The market only moves because of the donation: no other news, drift or noise.
   * The price ends up ``capture`` of the way to the true win probability (1 = all of it,
-    0.5 = half, 0 = it ignores the donation, 1.5 = it over-reacts). Time is folded into this one
+    0.5 = half, 0 = it ignores the donation, 1.5 = it over-reacts, below 0 = the price falls back). Time is folded into this one
     number: it is the share of the boost the price has captured by the time you sell.
   * No frictions: orders fill at the quoted price at any size, with no fees, spread, price impact
     or cost of tying up cash. So the trade profit is linear in the size of the position.

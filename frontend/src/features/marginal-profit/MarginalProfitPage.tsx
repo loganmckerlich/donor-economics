@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import ApiError from "@/components/ApiError";
 import AssumptionsPanel from "@/components/AssumptionsPanel";
 import { Mini, Section } from "@/components/Blocks";
@@ -16,9 +17,11 @@ import { money, moneyShort, pct } from "@/lib/format";
 import { fetchMarginal, type MarginalAnalysis, type MarginalParams } from "./api";
 import { ASSUMPTIONS_CONTENT } from "./assumptions";
 import { MFormField, MSlider } from "./fields";
-import { PayoffTable, ProbabilitySteps, ResponseTable } from "./parts";
-import { isPreset, presetState, PRESETS } from "./presets";
+import { CoverTarget, PayoffBars, ProbabilitySteps, ResponseTable } from "./parts";
+import { isPreset, presetState, PRESETS, START_PRESET } from "./presets";
 import { affectedCharts, DEFAULT_UI, type ParamId, type UiState } from "./scenario";
+
+const cents = (p: number) => `${(p * 100).toFixed(1)}¢`;
 
 const CAT = ["var(--series-1)", "var(--series-2)", "var(--series-3)"];
 const m0 = (v: number) => `$${(v / 1e6).toFixed(0)}M`;
@@ -26,7 +29,7 @@ const pts = (v: number) => `${v >= 0 ? "+" : "−"}${Math.abs(v * 100).toFixed(1
 const sig = (a: MarginalAnalysis) => JSON.stringify([a.outcome, a.strategy.optimal_donation]);
 
 export default function MarginalProfitPage() {
-  const [ui, setUi] = useState<UiState>(DEFAULT_UI);
+  const [ui, setUi] = useState<UiState>(presetState(START_PRESET));
   const [data, setData] = useState<MarginalAnalysis | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [active, setActive] = useState<ParamId | null>(null);
@@ -80,41 +83,27 @@ export default function MarginalProfitPage() {
 
   return (
     <ControlCtx.Provider value={ctx}>
-      <SummaryBar d={data} donation={ui.donation} onApply={applyBestDonation} hasGhost={!!visibleGhost} onClearGhost={() => setGhost(null)} />
+      <SummaryBar d={data} onApply={applyBestDonation} hasGhost={!!visibleGhost} onClearGhost={() => setGhost(null)} />
       <div className="mx-auto max-w-[1400px] space-y-8 px-4 py-6 sm:px-6">
         <header>
-          <h1 className="text-2xl font-semibold text-ink">Marginal profit strategy</h1>
+          <h1 className="text-2xl font-semibold text-ink">Donate for the big win, with a small trade as a cushion</h1>
           <p className="mt-1 max-w-3xl text-sm text-ink-2">
-            Instead of hedging, the donor <em>trades</em> the donation. The idea in five steps:
+            You donate to raise the chance your candidate wins the big payoff. If they lose, the donation is gone. So you also
+            <strong className="font-semibold text-ink"> buy YES first and sell it after</strong>: the donation pushes the YES price
+            up, and that profit is yours whether or not the candidate wins. It softens the loss; it does not change the stakes.
           </p>
-          <ol className="mt-2 max-w-3xl list-decimal space-y-0.5 pl-5 text-sm text-ink-2">
-            <li><strong className="font-semibold text-ink">Buy YES</strong> at today&apos;s price.</li>
-            <li><strong className="font-semibold text-ink">Donate</strong>, which raises the candidate&apos;s win probability.</li>
-            <li>The <strong className="font-semibold text-ink">probability goes up</strong>, and the YES price follows.</li>
-            <li><strong className="font-semibold text-ink">Sell the YES at a profit</strong>, before the election.</li>
-            <li>Optionally, <strong className="font-semibold text-ink">also win the payoff</strong> if the candidate wins.</li>
-          </ol>
-          <p className="mt-2 max-w-3xl text-sm text-ink-2">
-            The profit in step 4 is the same whether or not the candidate wins, because the YES is sold first. What it does not
-            remove is the election risk on the payoff, and it adds a new one: how far the market actually follows the donation.
-            Each section has its own sliders beside the charts they drive.
+          <Steps d={data} ui={ui} />
+          <div role="note" className="mt-3 max-w-3xl rounded-lg border border-series-2 bg-surface px-4 py-2.5 text-sm text-ink-2">
+            <strong className="font-semibold text-ink">Legal caution.</strong> Buying YES, donating to lift its price, then selling
+            may be treated as market manipulation or trading on non-public information. The model has no legal cost: a theory
+            exercise, not advice.
+          </div>
+          <p className="mt-3 max-w-3xl text-xs text-ink-3">
+            The cushion is guaranteed against the <em>election result</em>, not against the <em>market</em>: it assumes you buy
+            before anyone reacts, the price follows a set share of the boost, and orders fill with no fees or price impact. The
+            full list is in Model assumptions below; for the other way to cut risk, see the{" "}
+            <Link href="/full-hedge" className="underline underline-offset-2 hover:text-ink">Full Hedge page</Link>.
           </p>
-          <div role="note" className="mt-3 max-w-3xl rounded-lg border border-series-2 bg-surface px-4 py-3 text-sm text-ink-2">
-            <strong className="font-semibold text-ink">Legal caution.</strong> Buying YES, then making a donation expected to raise
-            the YES price, then selling is close to profiting from a price move you cause and know about in advance. Regulators may
-            treat that as market manipulation or trading on non-public information, and this model has no legal cost. It is a
-            theory exercise, not a recommendation or legal advice.
-          </div>
-          <div className="mt-3 max-w-3xl rounded-lg border border-grid bg-surface px-4 py-3 text-sm text-ink-2">
-            <div className="text-[11px] font-medium uppercase tracking-wide text-ink-3">The results rest on these assumptions</div>
-            <ul className="mt-1.5 list-disc space-y-1 pl-5">
-              <li>The donor buys <strong className="font-semibold text-ink">before anyone reacts</strong>: nobody else trades on the donation, or anticipates it. The donor knows first because the donor is the cause.</li>
-              <li>The price captures a <strong className="font-semibold text-ink">set share of the boost</strong> by the time you sell, and nothing else moves it. That share is illustrative, not measured from real markets.</li>
-              <li><strong className="font-semibold text-ink">No frictions</strong>: any order fills at the quoted price, with no fees, price impact or cost of cash. So the trade profit grows in a straight line with position size.</li>
-              <li>One buy and one sell, <strong className="font-semibold text-ink">before the election</strong>, so the trade profit is the same if the candidate wins or loses.</li>
-            </ul>
-            <p className="mt-2 text-xs text-ink-3">The full list, with examples and what is left out, is in Model assumptions below.</p>
-          </div>
         </header>
 
         <AssumptionsPanel content={ASSUMPTIONS_CONTENT} />
@@ -128,72 +117,106 @@ export default function MarginalProfitPage() {
   );
 }
 
+/** The five steps, filled in with this scenario's own numbers. */
+function Steps({ d, ui }: { d: MarginalAnalysis | null; ui: UiState }) {
+  const o = d?.outcome;
+  const p0 = d?.scenario.base_win_prob ?? ui.baseProb;
+  const covered = o && o.donation > 0 ? o.trade_profit / o.donation : null;
+  const b = "font-semibold text-ink";
+  return (
+    <ol className="mt-2 max-w-3xl list-decimal space-y-0.5 pl-5 text-sm text-ink-2">
+      <li>
+        <strong className={b}>Buy YES</strong> at today&apos;s price: {moneyShort(ui.capital)} at {cents(p0)}
+        {o ? <> buys {(o.shares / 1e6).toFixed(0)}M contracts, each paying $1 if the candidate wins.</> : "."}
+      </li>
+      <li>
+        <strong className={b}>Donate</strong> {moneyShort(ui.donation)}
+        {o ? <>: the true win chance goes from {pct(p0, 1)} to {pct(o.true_prob, 1)}.</> : "."}
+      </li>
+      <li>
+        The <strong className={b}>YES price follows</strong>
+        {o ? <>, from {cents(p0)} to {cents(o.price_after)} ({pct(ui.capture, 0)} of the boost).</> : "."}
+      </li>
+      <li>
+        <strong className={b}>Sell the YES</strong> before the election
+        {o ? <>: <strong className={b}>{money(o.trade_profit)}</strong>, win or lose
+          {covered !== null && <>, which {covered >= 1 ? "covers all of" : `covers ${pct(Math.max(covered, 0), 0)} of`} the donation</>}.</> : "."}
+      </li>
+      <li>
+        <strong className={b}>The big win</strong> is still on: if the candidate wins you also receive {moneyShort(ui.payoff)}.
+      </li>
+    </ol>
+  );
+}
+
 function SummaryBar({
-  d, donation, onApply, hasGhost, onClearGhost,
-}: { d: MarginalAnalysis | null; donation: number; onApply: () => void; hasGhost: boolean; onClearGhost: () => void }) {
+  d, onApply, hasGhost, onClearGhost,
+}: { d: MarginalAnalysis | null; onApply: () => void; hasGhost: boolean; onClearGhost: () => void }) {
   const o = d?.outcome;
   const st = d?.strategy;
-  const canApply = !!st && Math.abs(st.optimal_donation - donation) > 0.5e6;
+  const covered = o && o.donation > 0 ? o.trade_profit / o.donation : null;
+  const beQ = st?.break_even_capital ?? null;
+  const canApply = !!st && Math.abs(st.optimal_donation - (o?.donation ?? 0)) > 0.5e6;
   return (
     <div className="z-20 border-b border-grid bg-surface/95 sm:sticky sm:top-0 sm:backdrop-blur">
       <div className="mx-auto grid max-w-[1400px] grid-cols-2 items-start gap-x-6 gap-y-3 px-4 py-2.5 sm:px-6 lg:grid-cols-[repeat(4,minmax(0,1fr))_auto]">
         <Mini
-          label="Trade profit"
-          value={o ? money(o.trade_profit) : "…"}
-          sub="Earned whether or not the candidate wins"
-          tip={
-            <T title="Trade profit">
-              What the YES contracts earn: the number of contracts times the rise in their price, before the donation. Because
-              you sell before the election, it is the same whether the candidate wins or loses.
-            </T>
-          }
-        />
-        <Mini
-          label="If the candidate loses"
-          align="right"
+          label="Worst case (candidate loses)"
           value={o ? money(o.payoff_lose) : "…"}
-          sub={o ? `Trade profit minus the ${money(o.donation)} donation` : undefined}
+          sub={o ? `${money(o.payoff_lose_no_trade)} without the trade` : undefined}
           tip={
-            <T title="If the candidate loses">
-              The donor&apos;s result if the candidate loses: the trade profit minus the donation. Without the trade it would be
-              the donation lost. Positive means the donor comes out ahead even though the candidate lost.
+            <T title="Worst case">
+              The donor&apos;s result if the candidate loses: the trade profit minus the donation. The line underneath is what it
+              would be with no trade, so the difference is how far the trade raises the floor.
             </T>
           }
         />
         <Mini
-          label="If the candidate wins"
-          value={o ? money(o.payoff_win) : "…"}
-          sub={o && d ? `${money(d.scenario.payoff_if_win)} payoff plus the trade, minus the donation` : undefined}
-          tip={
-            <T title="If the candidate wins">
-              The donor&apos;s result if the candidate wins: the win payoff, plus the trade profit, minus the donation. The gap
-              between this and the losing case is always the win payoff, so the trade does not remove the election risk.
-            </T>
-          }
-        />
-        <Mini
-          label="Best donation"
+          label="Best case (candidate wins)"
           align="right"
-          value={st ? (st.optimal_donation > 0 ? moneyShort(st.optimal_donation) : "Don't donate") : "…"}
+          value={o ? money(o.payoff_win) : "…"}
+          sub={o ? `${money(o.payoff_win_no_trade)} without the trade` : undefined}
+          tip={
+            <T title="Best case">
+              The win payoff, plus the trade profit, minus the donation. The gap to the worst case is always the win payoff, so
+              the trade raises both outcomes by the same amount and does not narrow the range.
+            </T>
+          }
+        />
+        <Mini
+          label="Donation covered by the trade"
+          value={covered === null ? "—" : pct(covered, 0)}
           sub={
-            st
-              ? st.optimal_donation > 0
-                ? `Adds ${money(st.optimal_donation_ev)} of expected gain`
-                : "No donation size pays at these settings"
-              : undefined
+            !st || !o ? undefined
+              : o.donation === 0 ? "No donation to cover"
+              : covered !== null && covered >= 1 ? "Fully covered: a small win either way"
+              : beQ === null ? "The price has not risen: nothing is covered"
+              : `Needs ${moneyShort(beQ)} of YES to cover it all`
           }
           tip={
-            <T title="Best donation">
-              The donation with the highest expected gain, counting both the trade and the higher chance of winning, with the
-              other sliders where you have set them. $0 means every donated dollar returns less than a dollar, so the best move
-              is to give nothing.
+            <T title="Donation covered by the trade">
+              Trade profit divided by the donation. At 100% or more the trade pays for the donation, so you come out ahead even
+              if the candidate loses. Below that it only cushions part of the loss. The line underneath is the position size that
+              would cover it fully, at the price move you have set.
+            </T>
+          }
+        />
+        <Mini
+          label="Cash tied up"
+          align="right"
+          value={moneyShort(o ? o.shares * (d?.scenario.base_win_prob ?? 0) : 0)}
+          sub={st && o ? `Earns ${money(o.trade_profit)} (${pct(st.return_per_dollar, 1)}) if the price follows` : undefined}
+          tip={
+            <T title="Cash tied up">
+              What it costs to hold the cushion: the money spent on YES until you sell. The line underneath is what it earns, as a
+              share of that money, at the price move you have set. If the price falls instead, this is the money that loses.
             </T>
           }
         />
         <div className="col-span-2 flex items-center gap-3 lg:col-span-1">
           <Tip
             align="right" width="w-72" side="bottom"
-            content={<T title="Apply best donation">Sets the donation to the best amount for your other settings. Your previous charts stay behind as dotted lines.</T>}
+            content={<T title="Apply best donation">Sets the donation to the amount with the highest expected gain for your other settings{st ? ` (${st.optimal_donation > 0 ? moneyShort(st.optimal_donation) : "$0: do not donate"})` : ""}. Your previous charts stay behind as dotted lines.</T>}
           >
             <button onClick={onApply} disabled={!canApply}
               className="rounded-lg bg-series-1 px-3 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">
@@ -216,6 +239,7 @@ const standing = (v: number) => (v >= 0 ? <strong>{money(v)} ahead</strong> : <s
 function Sections({
   d, ghost, ui, active, set,
 }: { d: MarginalAnalysis; ghost: MarginalAnalysis | null; ui: UiState; active: ParamId | null; set: (p: Partial<UiState>) => void }) {
+  const { snapshot } = useContext(ControlCtx);
   const o = d.outcome;
   const st = d.strategy;
   const cc = d.curves.capital;
@@ -228,34 +252,40 @@ function Sections({
   const beC = st.break_even_capture;
   const expectedAbs = (win: number[], lose: number[]) => win.map((w, i) => o.true_prob * w + (1 - o.true_prob) * lose[i]);
 
+  const covered = o.donation > 0 ? o.trade_profit / o.donation : null;
   const verdict = (
-    <>
-      If the candidate loses, the donor is {standing(o.payoff_lose)}: the trade earns <strong>{money(o.trade_profit)}</strong> and the
-      donation costs {money(o.donation)}. If the candidate wins, the donor is {standing(o.payoff_win)}. The trade adds the same{" "}
-      {money(o.trade_profit)} to both outcomes.{" "}
-      {beQ !== null ? (
-        <>
-          Each dollar in YES earns {pct(st.return_per_dollar)}, so the trade alone covers the donation at{" "}
-          <strong>{moneyShort(beQ)}</strong> of YES (you have {moneyShort(ui.capital)}).
-        </>
-      ) : (
-        <>The price has not risen, so the trade earns nothing at any size and the worst case is the donation itself.</>
-      )}{" "}
-      {st.optimal_donation === 0 ? (
-        <>
-          <strong>Don&apos;t donate at these settings.</strong> The first donated dollar returns only{" "}
-          <strong>${st.first_dollar_return.toFixed(2)}</strong>, and returns fall from there.
-        </>
-      ) : (
-        <>
-          <strong>The best donation is {moneyShort(st.optimal_donation)}</strong>, adding {money(st.optimal_donation_ev)} of expected
-          gain (the first dollar returns ${st.first_dollar_return.toFixed(2)}).
-        </>
-      )}{" "}
-      Expected gain from your plan: <strong>{money(o.ev)}</strong> ({money(o.profit)} from the trade net of the donation, plus{" "}
-      {money(o.win_value)} from the higher win chance). There are no fees or price impact in this model, so the trade grows
-      without limit as the position grows.
-    </>
+    <div className="space-y-2">
+      <p>
+        <strong>Downside.</strong> If the candidate loses you are {standing(o.payoff_lose)}: the donation costs {money(o.donation)} and the
+        trade earns {money(o.trade_profit)}
+        {covered !== null && covered >= 1
+          ? <>, which pays for the donation in full. That is the small win you keep either way, <em>if the market follows the donation</em>.</>
+          : covered !== null && covered > 0
+            ? <>, covering {pct(covered, 0)} of it. Without the trade you would be {money(-o.payoff_lose_no_trade)} behind.</>
+            : <>. The trade is not helping: it earns nothing, or loses money because the price fell.</>}
+      </p>
+      <p>
+        <strong>Upside.</strong> If the candidate wins you are {standing(o.payoff_win)}: the {money(d.scenario.payoff_if_win)} payoff plus the
+        trade, minus the donation. The gap to the losing case is still {money(d.scenario.payoff_if_win)}, so the trade lifts the floor without
+        shrinking the stakes.
+      </p>
+      <p>
+        <strong>Is it worth it?</strong> Holding the cushion ties up {moneyShort(ui.capital)} and earns {pct(st.return_per_dollar, 1)} on it.
+        {beQ !== null && <> The trade alone covers the donation at <strong>{moneyShort(beQ)}</strong> of YES.</>}{" "}
+        {st.optimal_donation === 0 ? (
+          <>
+            Counting the higher win chance too, <strong>{money(o.ev)}</strong> is the expected gain, and no donation size does better than
+            giving nothing (the first donated dollar returns ${st.first_dollar_return.toFixed(2)}).
+          </>
+        ) : (
+          <>
+            Counting the higher win chance too, the expected gain is <strong>{money(o.ev)}</strong>; the best donation is{" "}
+            <strong>{moneyShort(st.optimal_donation)}</strong> ({money(st.optimal_donation_ev)}, the first dollar returns ${st.first_dollar_return.toFixed(2)}).
+          </>
+        )}{" "}
+        With no fees or price impact the trade grows without limit as the position grows.
+      </p>
+    </div>
   );
 
   const g = ghost;
@@ -286,7 +316,7 @@ function Sections({
       onChange={(v) => set({ capital: v })} />
   );
   const captureSlider = (
-    <MSlider param="capture" label="Share of the boost the price captures" value={ui.capture} min={0} max={2} step={0.05}
+    <MSlider param="capture" label="Share of the boost the price captures" value={ui.capture} min={-1} max={2} step={0.05}
       display={`${Math.round(ui.capture * 100)}%`} readout={`price ${pct(d.scenario.base_win_prob, 1)} → ${pct(o.price_after, 1)}`}
       onChange={(v) => set({ capture: v })} />
   );
@@ -322,17 +352,19 @@ function Sections({
         </ChartCard>
 
         <ChartCard n={2} ringed={ringed(2)} title="Payoff by outcome"
-          takeaway={<>The trade earns <strong>{money(o.trade_profit)}</strong> whichever way the election goes, so the losing case improves from {money(o.payoff_lose_no_trade)} to <strong>{money(o.payoff_lose)}</strong>.</>}>
-          <PayoffTable o={o} />
+          takeaway={<>The trade earns <strong>{money(o.trade_profit)}</strong> whichever way the election goes, so the floor rises from {money(o.payoff_lose_no_trade)} to <strong>{money(o.payoff_lose)}</strong>.</>}>
+          <PayoffBars o={o} payoff={d.scenario.payoff_if_win} />
         </ChartCard>
       </Section>
 
-      <Section letter="B" title="How big should it be?"
+      <Section letter="B" title="How big a cushion?"
         question="A bigger position earns more on each point of price move; a bigger donation moves the price more. With no fees or price impact, the trade grows in a straight line with the position."
         controls={
           <>
             {donationSlider}
             {capitalSlider}
+            <CoverTarget donation={ui.donation} capital={ui.capital} returnPerDollar={st.return_per_dollar}
+              maxCapital={1e9} onApply={(q) => { snapshot(); set({ capital: q }); }} />
           </>
         }>
         <ChartCard n={3} ringed={ringed(3)} title="Payoff by trade size"
@@ -378,7 +410,7 @@ function Sections({
           </>
         }>
         <ChartCard n={5} ringed={ringed(5)} title="Profit by market response"
-          takeaway={<>The trade earns back the donation once the price captures <strong>{beC === null ? "—" : pct(beC, 0)}</strong> of the boost. If the market ignores the donation, the worst case is {money(d.responses[0].payoff_lose)}: just the donation.</>}>
+          takeaway={<>The trade earns back the donation once the price captures <strong>{beC === null ? "—" : pct(beC, 0)}</strong> of the boost. If the market ignores the donation you lose just the donation ({money(d.responses[0].payoff_lose)}); if the price falls back (below 0%), the trade loses money on top of it.</>}>
           <LineChart
             ariaLabel="Expected gain and the result if the candidate loses, by share of the boost the price captures"
             x={pc.capture}

@@ -20,7 +20,7 @@ export const TIPS: Record<ParamId, [string, string]> = {
   ],
   capture: [
     "Share of the boost the price captures",
-    "How far the price has moved toward the new win probability by the time you sell. 100% means it has fully caught up; 50% means half; 0% means the market ignored the donation; above 100% means it over-reacted. It folds in both how much the market believes the donation and how long you wait.",
+    "How far the price has moved toward the new win probability by the time you sell. 100% means it has fully caught up; 50% means half; 0% means the market ignored the donation; above 100% means it over-reacted; below 0% means the price fell back, so the trade loses money. It folds in both how much the market believes the donation and how long you wait.",
   ],
   payoff: [
     "Payoff if the candidate wins (V)",

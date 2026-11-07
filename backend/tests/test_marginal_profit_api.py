@@ -170,12 +170,14 @@ def test_capital_curve_shifts_both_outcomes_equally_in_a_straight_line():
 def test_capture_curve_is_a_straight_line_from_the_donation():
     body = dict(effect_size=0.08 / LN6, donation=40e6, capital=500e6)
     cp = post(**body)["curves"]["capture"]
-    assert cp["capture"][0] == 0 and cp["capture"][-1] == 2
-    assert cp["profit"][0] == pytest.approx(-40e6)  # the market ignores it: only the donation is lost
+    assert cp["capture"][0] == -1 and cp["capture"][-1] == 2
+    assert cp["capture"][20] == pytest.approx(0)
+    assert cp["profit"][20] == pytest.approx(-40e6)  # the market ignores it: only the donation is lost
+    assert cp["profit"][0] < -40e6  # the price falls back: the trade loses money on top of the donation
     slopes = [(cp["profit"][i + 1] - cp["profit"][i]) / 0.05 for i in range(len(cp["profit"]) - 1)]
     assert max(slopes) == pytest.approx(min(slopes), rel=1e-9)
     m = model(**body)
-    for k in (0, 10, 20, 40):
+    for k in (0, 10, 20, 40, 60):
         assert cp["ev"][k] == pytest.approx(evaluate(replace(m, capture=cp["capture"][k])).ev)
 
 
@@ -203,3 +205,10 @@ def test_validation():
     assert c.post(URL, json={"payoff_if_win": -1}).status_code == 422
     assert c.post(URL, json={"base_win_prob": 1.5}).status_code == 422
     assert c.post(URL, json={"capital": -1}).status_code == 422
+
+
+def test_a_falling_price_makes_the_cushion_lose_money():
+    j = post(effect_size=0.08 / LN6, donation=40e6, capital=500e6, capture=-0.5)
+    assert j["outcome"]["trade_profit"] < 0
+    assert j["outcome"]["payoff_lose"] < -40e6
+    assert c.post(URL, json={"capture": -1.5}).status_code == 422
