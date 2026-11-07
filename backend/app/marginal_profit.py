@@ -1,13 +1,16 @@
-"""Chart data for the marginal-profit strategy. Thin layer over ``donor_economics.marginal``."""
+"""Marginal profit strategy API: request schema, chart data builder and route. All money in dollars."""
 
 from dataclasses import asdict, replace
+from typing import Literal
 
 import numpy as np
+from fastapi import APIRouter
+from pydantic import BaseModel, Field
 
-from donor_economics import MarginalScenario
-from donor_economics.marginal import evaluate, price_at
+from donor_economics import MarginalProfitScenario
+from donor_economics.marginal_profit import evaluate, price_at
 
-from .analysis import _clean
+from .util import clean
 
 MAX_MONTHS = 12.0
 MAX_DONATION = 200e6  # matches the UI slider ranges; beyond these the model is extrapolating
@@ -15,7 +18,7 @@ MAX_CAPITAL = 1e9
 HALF_LIFE_RANGE = (0.1, 6.0)  # months, log-spaced on the heatmap
 
 
-def _profit(m: MarginalScenario) -> float:
+def _profit(m: MarginalProfitScenario) -> float:
     return evaluate(m).profit
 
 
@@ -25,9 +28,9 @@ def _argmax(xs: np.ndarray, f) -> tuple[float, float]:
     return float(xs[i]), float(vals[i])
 
 
-def marginal_analysis(m: MarginalScenario, n_heat: int = 21) -> dict:
+def marginal_analysis(m: MarginalProfitScenario, n_heat: int = 21) -> dict:
     o = evaluate(m)
-    p0 = m.base.base_win_prob
+    p0 = m.base_win_prob
 
     # Best choice of each lever on its own, the others held where the user has them.
     best_hold, best_hold_profit = _argmax(
@@ -114,9 +117,9 @@ def marginal_analysis(m: MarginalScenario, n_heat: int = 21) -> dict:
         ],
     }
 
-    return _clean(
+    return clean(
         {
-            "scenario": {"base": asdict(m.base), **{k: v for k, v in asdict(m).items() if k != "base"}},
+            "scenario": asdict(m),
             "outcome": asdict(o),
             "strategy": {
                 "profitable": o.profit > 0,
@@ -135,3 +138,36 @@ def marginal_analysis(m: MarginalScenario, n_heat: int = 21) -> dict:
             "sweeps": {"time": time_heat, "size": size_heat},
         }
     )
+
+
+# --- Request schema --------------------------------------------------------------------------
+
+
+class MarginalIn(BaseModel):
+    """Marginal-profit strategy. Win-probability curve fields match ``ScenarioIn``."""
+
+    base_win_prob: float = Field(0.50, gt=0, lt=0.99)
+    effect_size: float = Field(0.015, ge=0, le=1)
+    effect_scale: float = Field(10e6, gt=0, le=1e11)
+    effect_form: Literal["log", "linear", "saturating"] = "log"
+    donation: float = Field(10e6, ge=0, le=1e10)
+    capital: float = Field(100e6, ge=0, le=1e10)  # $ spent buying YES
+    hold_months: float = Field(3.0, ge=0, le=60)
+    half_life_months: float = Field(1.0, ge=0, le=60)  # 0 = the market reprices instantly
+    belief: float = Field(1.0, ge=0, le=3)  # share of the true boost the market ends up pricing
+    depth_per_point: float = Field(200e6, gt=0, le=1e12)  # $ of orders that move the price 1 point
+    fee_rate: float = Field(0.01, ge=0, le=0.2)  # per side
+    carry_rate: float = Field(0.05, ge=0, le=1)  # annual
+
+    def to_model(self) -> MarginalProfitScenario:
+        return MarginalProfitScenario(**self.model_dump())
+
+
+# --- Route -----------------------------------------------------------------------------------
+
+router = APIRouter(prefix="/api/marginal-profit", tags=["marginal profit"])
+
+
+@router.post("/analysis")
+def post_analysis(body: MarginalIn) -> dict:
+    return marginal_analysis(body.to_model())

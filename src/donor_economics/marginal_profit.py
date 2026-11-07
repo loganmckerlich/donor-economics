@@ -1,4 +1,4 @@
-"""Marginal-profit strategy: buy YES, donate, sell once the market has moved.
+"""Marginal profit strategy: buy YES, donate, sell once the market has moved.
 
 The donor does not hold to the election and does not hedge. They buy YES contracts at the
 current price, make the donation, wait ``hold`` months, then sell. The donation raises the
@@ -26,12 +26,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .model import P_CAP, Scenario
+from .effect import P_CAP, win_prob
 
 
 @dataclass(frozen=True)
-class MarginalScenario:
-    base: Scenario = Scenario()  # p0, effect size / scale / form (payoff and risk aversion unused)
+class MarginalProfitScenario:
+    base_win_prob: float = 0.50  # p0: the price YES is bought at, before the donation
+    effect_size: float = 0.015  # k: see ``effect.win_prob``
+    effect_scale: float = 10e6  # s
+    effect_form: str = "log"  # "log" | "linear" | "saturating"
     donation: float = 10e6  # D
     capital: float = 100e6  # Q: dollars spent buying YES
     hold_months: float = 3.0  # time between buying and selling
@@ -42,8 +45,15 @@ class MarginalScenario:
     carry_rate: float = 0.05  # annual opportunity cost of the cash tied up in YES
 
 
+    def win_prob(self, donation: float) -> float:
+        """True win probability after donating ``donation``."""
+        return win_prob(
+            donation, base=self.base_win_prob, size=self.effect_size, scale=self.effect_scale, form=self.effect_form
+        )
+
+
 @dataclass(frozen=True)
-class MarginalOutcome:
+class MarginalProfitOutcome:
     entry_price: float  # average fill when buying
     exit_price: float  # average fill when selling
     market_price: float  # quoted price at exit, before the sale moves it
@@ -59,10 +69,10 @@ class MarginalOutcome:
     roi: float  # profit / (capital + donation)
 
 
-def target_price(m: MarginalScenario) -> float:
+def target_price(m: MarginalProfitScenario) -> float:
     """Price the market converges to: p0 plus ``belief`` of the true boost."""
-    p0 = m.base.base_win_prob
-    boost = m.base.win_prob(m.donation) - p0
+    p0 = m.base_win_prob
+    boost = m.win_prob(m.donation) - p0
     return min(max(p0 + m.belief * boost, 0.001), P_CAP)
 
 
@@ -73,13 +83,13 @@ def catch_up(hold_months: float, half_life_months: float) -> float:
     return 1.0 - 0.5 ** (hold_months / half_life_months)
 
 
-def price_at(m: MarginalScenario, months: float) -> float:
-    p0 = m.base.base_win_prob
+def price_at(m: MarginalProfitScenario, months: float) -> float:
+    p0 = m.base_win_prob
     return p0 + (target_price(m) - p0) * catch_up(months, m.half_life_months)
 
 
-def evaluate(m: MarginalScenario) -> MarginalOutcome:
-    p0 = m.base.base_win_prob
+def evaluate(m: MarginalProfitScenario) -> MarginalProfitOutcome:
+    p0 = m.base_win_prob
     tgt = target_price(m)
     mkt = p0 + (tgt - p0) * catch_up(m.hold_months, m.half_life_months)
     q = m.capital
@@ -96,12 +106,12 @@ def evaluate(m: MarginalScenario) -> MarginalOutcome:
     fees = m.fee_rate * (q + proceeds)
     carry = q * m.carry_rate * m.hold_months / 12.0
     profit = proceeds - q - fees - carry - m.donation
-    return MarginalOutcome(
+    return MarginalProfitOutcome(
         entry_price=entry,
         exit_price=exit_,
         market_price=mkt,
         target_price=tgt,
-        true_prob=m.base.win_prob(m.donation),
+        true_prob=m.win_prob(m.donation),
         shares=shares,
         gross_gain=gross,
         slippage=slippage,

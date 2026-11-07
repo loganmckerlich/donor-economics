@@ -1,6 +1,6 @@
 # Donor Hedging Economics Knowledgebase
 
-Background notes for `src/donor_economics/model.py`. Research date: 2026-11-05 (two days after the 2026 US midterms). Background research, partly unverified; not legal or financial advice.
+Background notes for `src/donor_economics/full_hedge.py`. Research date: 2026-11-05 (two days after the 2026 US midterms). Background research, partly unverified; not legal or financial advice.
 
 ## Question
 Can a billionaire donor who gains `V` if candidate A wins, and donates `D` to A, economically justify buying the NO side of A's market (size `H`) as a hedge?

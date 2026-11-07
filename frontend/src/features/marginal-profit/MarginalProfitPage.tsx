@@ -4,20 +4,20 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AssumptionsPanel from "@/components/AssumptionsPanel";
 import { Mini, Section } from "@/components/Blocks";
 import ChartCard from "@/components/ChartCard";
-import {
-  AdvancedGroup, ControlCtx, FormField, SliderField, type FieldMeta,
-} from "@/components/Controls";
+import ApiError from "@/components/ApiError";
+import { AdvancedGroup, ControlCtx } from "@/components/Controls";
 import Heatmap from "@/components/Heatmap";
 import LineChart, { type Series } from "@/components/LineChart";
+import PresetBar from "@/components/PresetBar";
 import Tip, { T } from "@/components/Tip";
 import useDebounced from "@/components/useDebounced";
-import { fetchMarginal, type MarginalAnalysis, type MarginalOutcome, type MarginalParams } from "@/lib/api";
 import { boostToK } from "@/lib/effect";
 import { money, moneyShort, pct } from "@/lib/format";
-import {
-  DEFAULT_M, isMPreset, mAffectedCharts, mPresetState, M_AFFECTS, M_ASSUMPTIONS, M_CHART_TITLES, M_PRESETS, M_TIPS,
-  type MParam, type MState,
-} from "@/lib/marginal";
+import { fetchMarginal, type MarginalAnalysis, type MarginalOutcome, type MarginalParams } from "./api";
+import { ASSUMPTIONS_CONTENT } from "./assumptions";
+import { MFormField, MSlider } from "./fields";
+import { isPreset, presetState, PRESETS } from "./presets";
+import { affectedCharts, DEFAULT_UI, type ParamId, type UiState } from "./scenario";
 
 const CAT = ["var(--series-1)", "var(--series-2)", "var(--series-3)"];
 const m0 = (v: number) => `$${(v / 1e6).toFixed(0)}M`;
@@ -26,32 +26,20 @@ const pts = (v: number) => `${v >= 0 ? "+" : "−"}${Math.abs(v * 100).toFixed(1
 const roundSig = (x: number) => { const mag = 10 ** (Math.floor(Math.log10(x)) - 1); return Math.round(x / mag) * mag; };
 const sig = (a: MarginalAnalysis) => JSON.stringify([a.outcome, a.strategy.best_plan]);
 
-const meta = (p: MParam): FieldMeta => ({
-  tip: <T title={M_TIPS[p][0]}>{M_TIPS[p][1]}</T>,
-  affects: M_AFFECTS[p],
-  titles: M_CHART_TITLES,
-});
-
-/** A slider wired to this page's tooltips and chart chips. */
-function MSlider(props: Omit<Parameters<typeof SliderField>[0], "param" | "tip" | "affects" | "titles"> & { param: MParam }) {
-  return <SliderField {...props} {...meta(props.param)} />;
-}
-
-export default function MarginalPage() {
-  const [ui, setUi] = useState<MState>(DEFAULT_M);
+export default function MarginalProfitPage() {
+  const [ui, setUi] = useState<UiState>(DEFAULT_UI);
   const [data, setData] = useState<MarginalAnalysis | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [active, setActive] = useState<MParam | null>(null);
+  const [active, setActive] = useState<ParamId | null>(null);
   const [ghost, setGhost] = useState<MarginalAnalysis | null>(null);
 
   const dataRef = useRef<MarginalAnalysis | null>(null);
   useEffect(() => { dataRef.current = data; }, [data]);
 
-  const set = useCallback((patch: Partial<MState>) => setUi((u) => ({ ...u, ...patch })), []);
+  const set = useCallback((patch: Partial<UiState>) => setUi((u) => ({ ...u, ...patch })), []);
   const ctx = useMemo(
     () => ({
-      set: () => {}, // unused here: sliders call `set` through their own onChange
-      setActive: (id: string | null) => setActive(id as MParam | null),
+      setActive: (id: string | null) => setActive(id as ParamId | null),
       snapshot: () => setGhost(dataRef.current),
     }),
     [],
@@ -87,7 +75,7 @@ export default function MarginalPage() {
   const visibleGhost = ghost && data && sig(ghost) !== sig(data) ? ghost : null;
   const pickPreset = (i: number) => {
     setGhost(dataRef.current);
-    setUi(mPresetState(M_PRESETS[i]));
+    setUi(presetState(PRESETS[i]));
   };
   const applyBest = () => {
     if (!data || data.strategy.best_plan.profit <= 0) return;
@@ -110,42 +98,14 @@ export default function MarginalPage() {
           </p>
         </header>
 
-        <AssumptionsPanel content={M_ASSUMPTIONS} />
-        <PresetBar ui={ui} onPick={pickPreset} />
+        <AssumptionsPanel content={ASSUMPTIONS_CONTENT} />
+        <PresetBar presets={PRESETS} isActive={(p) => isPreset(ui, p)} onPick={pickPreset} />
 
-        {error && (
-          <div role="alert" className="rounded-xl border border-series-2 bg-surface p-4 text-sm text-ink">
-            Could not reach the API ({error}). Start it with{" "}
-            <code className="font-mono">uvicorn app.main:app --port 8000</code> from <code className="font-mono">backend/</code>.
-          </div>
-        )}
+        {error && <ApiError message={error} />}
         {!data && !error && <div className="text-sm text-ink-3">Loading…</div>}
         {data && <Sections d={data} ghost={visibleGhost} ui={ui} active={active} set={set} />}
       </div>
     </ControlCtx.Provider>
-  );
-}
-
-function PresetBar({ ui, onPick }: { ui: MState; onPick: (i: number) => void }) {
-  return (
-    <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Scenarios">
-      <span className="mr-1 text-sm text-ink-2">Scenarios</span>
-      {M_PRESETS.map((p, i) => {
-        const on = isMPreset(ui, p);
-        return (
-          <Tip key={p.id} side="bottom" width="w-80" className="inline-block" content={<T title={p.label}>{p.blurb}</T>}>
-            <button
-              onClick={() => onPick(i)} aria-pressed={on}
-              className={`rounded-full border px-3 py-1 text-sm transition-colors ${
-                on ? "border-series-1 bg-series-1 text-white" : "border-axis bg-surface text-ink-2 hover:text-ink"
-              }`}
-            >
-              {p.label}
-            </button>
-          </Tip>
-        );
-      })}
-    </div>
   );
 }
 
@@ -277,16 +237,16 @@ function Breakdown({ o }: { o: MarginalOutcome }) {
 
 function Sections({
   d, ghost, ui, active, set,
-}: { d: MarginalAnalysis; ghost: MarginalAnalysis | null; ui: MState; active: MParam | null; set: (p: Partial<MState>) => void }) {
+}: { d: MarginalAnalysis; ghost: MarginalAnalysis | null; ui: UiState; active: ParamId | null; set: (p: Partial<UiState>) => void }) {
   const o = d.outcome;
   const st = d.strategy;
   const plan = st.best_plan;
   const tc = d.curves.time;
   const dc = d.curves.donation;
   const cc = d.curves.capital;
-  const ringed = (n: number) => active !== null && mAffectedCharts(active).includes(n);
+  const ringed = (n: number) => active !== null && affectedCharts(active).includes(n);
   const caught = ui.halfLife <= 0 ? 1 : 1 - 0.5 ** (ui.hold / ui.halfLife);
-  const dflt = DEFAULT_M;
+  const dflt = DEFAULT_UI;
   const advancedA = ui.baseProb !== dflt.baseProb || ui.effectForm !== dflt.effectForm || ui.effectScale !== dflt.effectScale;
   const advancedB = ui.depth !== dflt.depth || ui.fee !== dflt.fee || ui.carry !== dflt.carry;
 
@@ -370,7 +330,7 @@ function Sections({
             <AdvancedGroup modified={advancedA}>
               <MSlider param="baseProb" label="Win probability, no donation (p₀)" value={ui.baseProb} min={0.05} max={0.95} step={0.01}
                 display={`${(ui.baseProb * 100).toFixed(0)}%`} onChange={(v) => set({ baseProb: v })} />
-              <FormField {...meta("effectForm")} value={ui.effectForm} onChange={(v) => set({ effectForm: v })} />
+              <MFormField value={ui.effectForm} onChange={(v) => set({ effectForm: v })} />
               <MSlider param="effectScale" label="Effect scale (s)" value={ui.effectScale} min={1e6} max={100e6} step={1e6}
                 display={m0(ui.effectScale)} onChange={(v) => set({ effectScale: v })} />
             </AdvancedGroup>

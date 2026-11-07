@@ -7,8 +7,8 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Donor Hedge Explorer",
-  description: "Is it economically viable for a political donor to hedge on a prediction market?",
+  title: "Donor Economics",
+  description: "Is it economically viable for a political donor to use a prediction market, by hedging or by trading the donation's effect?",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

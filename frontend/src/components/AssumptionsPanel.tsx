@@ -1,6 +1,16 @@
-import {
-  ASSUMPTIONS, DEFAULT_SCENARIO_NOTE, DEPENDS, LEFT_OUT, type Assumption, type Dependency,
-} from "@/lib/assumptions";
+/** Plain-language statements of what a model assumes, each with a worked example. */
+export interface Assumption {
+  title: string;
+  statement: string;
+  example: string;
+}
+
+/** One headline result, what it rests on, and what would change it. */
+export interface Dependency {
+  result: string;
+  rests: string;
+  breaks: string;
+}
 
 export interface AssumptionsContent {
   note: string;
@@ -8,10 +18,6 @@ export interface AssumptionsContent {
   leftOut: Assumption[];
   depends: Dependency[];
 }
-
-const HEDGE_CONTENT: AssumptionsContent = {
-  note: DEFAULT_SCENARIO_NOTE, assumptions: ASSUMPTIONS, leftOut: LEFT_OUT, depends: DEPENDS,
-};
 
 function Card({ a, marker }: { a: Assumption; marker: React.ReactNode }) {
   return (
@@ -31,7 +37,7 @@ function Card({ a, marker }: { a: Assumption; marker: React.ReactNode }) {
   );
 }
 
-export default function AssumptionsPanel({ content = HEDGE_CONTENT }: { content?: AssumptionsContent }) {
+export default function AssumptionsPanel({ content }: { content: AssumptionsContent }) {
   const { note, assumptions: ASSUMPTIONS, leftOut: LEFT_OUT, depends: DEPENDS } = content;
   return (
     <details id="assumptions" className="group/ap rounded-xl border border-grid bg-surface">

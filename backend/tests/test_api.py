@@ -12,7 +12,7 @@ def test_defaults_and_health():
 
 
 def test_analysis_matches_closed_forms():
-    r = c.post("/api/analysis", json={"scenario": {"risk_aversion": 4e-10}, "donation": 50e6, "hedge": 25e6})
+    r = c.post("/api/full-hedge/analysis", json={"scenario": {"risk_aversion": 4e-10}, "donation": 50e6, "hedge": 25e6})
     assert r.status_code == 200
     j = r.json()
     full = j["fully_hedged"]
@@ -26,31 +26,31 @@ def test_analysis_matches_closed_forms():
 
 
 def test_null_hedge_means_full_hedge():
-    j = c.post("/api/analysis", json={"hedge": None}).json()
+    j = c.post("/api/full-hedge/analysis", json={"hedge": None}).json()
     assert abs(j["hedge"] - j["strategy"]["full_hedge_size"]) < 1
 
 
 def test_hedge_fraction_scales_the_full_hedge():
-    j = c.post("/api/analysis", json={"hedge_fraction": 0.5}).json()
+    j = c.post("/api/full-hedge/analysis", json={"hedge_fraction": 0.5}).json()
     assert abs(j["hedge"] - 0.5 * j["strategy"]["full_hedge_size"]) < 1
-    j = c.post("/api/analysis", json={"hedge_fraction": 1.0, "hedge": 3e6}).json()  # fraction wins
+    j = c.post("/api/full-hedge/analysis", json={"hedge_fraction": 1.0, "hedge": 3e6}).json()  # fraction wins
     assert abs(j["hedge"] - j["strategy"]["full_hedge_size"]) < 1
 
 
 def test_validation_rejects_bad_input():
-    assert c.post("/api/analysis", json={"scenario": {"base_win_prob": 1.5}}).status_code == 422
+    assert c.post("/api/full-hedge/analysis", json={"scenario": {"base_win_prob": 1.5}}).status_code == 422
 
 
 def test_heatmaps():
-    j = c.post("/api/sweep/donation-heatmap", json={"n": 6}).json()
+    j = c.post("/api/full-hedge/sweep/donation-heatmap", json={"n": 6}).json()
     assert len(j["optimal_donation"]) == 6 and len(j["optimal_donation"][0]) == 6
     assert j["optimal_donation"][0][0] == 0  # k = 0: donating never pays
-    j = c.post("/api/sweep/hedge-value", json={"n": 6}).json()
+    j = c.post("/api/full-hedge/sweep/hedge-value", json={"n": 6}).json()
     assert all(v >= -1 for row in j["ce_gain"] for v in row)  # hedging never hurts CE
 
 
 def test_marginal_analysis_shape_and_consistency():
-    r = c.post("/api/marginal", json={})
+    r = c.post("/api/marginal-profit/analysis", json={})
     assert r.status_code == 200
     j = r.json()
     o = j["outcome"]
@@ -64,16 +64,16 @@ def test_marginal_analysis_shape_and_consistency():
 
 def test_marginal_best_plan_beats_doing_nothing_when_it_pays():
     big = {"effect_size": 0.045, "depth_per_point": 500e6, "fee_rate": 0.005}
-    j = c.post("/api/marginal", json=big).json()
+    j = c.post("/api/marginal-profit/analysis", json=big).json()
     plan = j["strategy"]["best_plan"]
     assert plan["profit"] > 0 and plan["donation"] > 0 and plan["capital"] > 0
-    again = c.post("/api/marginal", json={**big, "donation": plan["donation"], "capital": plan["capital"], "hold_months": plan["hold_months"]}).json()
+    again = c.post("/api/marginal-profit/analysis", json={**big, "donation": plan["donation"], "capital": plan["capital"], "hold_months": plan["hold_months"]}).json()
     assert abs(again["outcome"]["profit"] - plan["profit"]) < 1
 
 
 def test_marginal_validation():
-    assert c.post("/api/marginal", json={"belief": 5}).status_code == 422
-    assert c.post("/api/marginal", json={"depth_per_point": 0}).status_code == 422
+    assert c.post("/api/marginal-profit/analysis", json={"belief": 5}).status_code == 422
+    assert c.post("/api/marginal-profit/analysis", json={"depth_per_point": 0}).status_code == 422
 
 
 def test_knowledge_list_and_get():

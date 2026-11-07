@@ -4,16 +4,12 @@
  * boost from $50M, gamma = 2 on $5B) and were computed with the Python model. Keep in sync with
  * the "Modeling assumptions" section of the README.
  */
-export interface Assumption {
-  title: string;
-  statement: string;
-  example: string;
-}
+import type { Assumption, AssumptionsContent, Dependency } from "@/components/AssumptionsPanel";
 
-export const DEFAULT_SCENARIO_NOTE =
+const DEFAULT_SCENARIO_NOTE =
   "Examples use the default scenario: a $100M payoff, a $50M donation, a 50% starting win chance and a 2.7-point boost from a $50M donation.";
 
-export const ASSUMPTIONS: Assumption[] = [
+const ASSUMPTIONS: Assumption[] = [
   {
     title: "One shot, no timing",
     statement: "The donor makes one donation and one hedge, then the election resolves. Nothing changes in between.",
@@ -73,7 +69,7 @@ export const ASSUMPTIONS: Assumption[] = [
   },
 ];
 
-export const LEFT_OUT: Assumption[] = [
+const LEFT_OUT: Assumption[] = [
   {
     title: "Access or goodwill from donating",
     statement: "Any value the donation buys regardless of who wins.",
@@ -116,14 +112,7 @@ export const LEFT_OUT: Assumption[] = [
   },
 ];
 
-export interface Dependency {
-  result: string;
-  rests: string;
-  breaks: string;
-}
-
-/** Headline results and the assumptions they rest on. Numbers refer to ASSUMPTIONS (1-based). */
-export const DEPENDS: Dependency[] = [
+const DEPENDS: Dependency[] = [
   {
     result: "A hedge costs nothing in expected profit",
     rests: "Assumptions 8 and 9, and no fees or cost of tying up money.",
@@ -147,3 +136,10 @@ export const DEPENDS: Dependency[] = [
     breaks: "It only narrows the spread of outcomes around the same average, so it cannot turn a losing donation into a winning one.",
   },
 ];
+
+export const ASSUMPTIONS_CONTENT: AssumptionsContent = {
+  note: DEFAULT_SCENARIO_NOTE,
+  assumptions: ASSUMPTIONS,
+  leftOut: LEFT_OUT,
+  depends: DEPENDS,
+};

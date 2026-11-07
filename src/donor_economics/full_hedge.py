@@ -1,4 +1,4 @@
-"""Core economics of a donor hedging a political outcome on a prediction market.
+"""Full hedge strategy: donate, then hedge the outcome on a prediction market.
 
 Assumptions (see README.md):
   * Static, one-shot, binary market.
@@ -20,7 +20,7 @@ import math
 
 import numpy as np
 
-P_CAP = 0.999  # keep prices strictly inside (0, 1)
+from .effect import win_prob
 
 
 @dataclass(frozen=True)
@@ -34,17 +34,9 @@ class Scenario:
 
     def win_prob(self, donation):
         """P(A wins) given donation(s). Accepts a float or a numpy array."""
-        x = np.asarray(donation, dtype=float) / self.effect_scale
-        if self.effect_form == "log":
-            lift = self.effect_size * np.log1p(x)
-        elif self.effect_form == "linear":
-            lift = self.effect_size * x
-        elif self.effect_form == "saturating":
-            lift = self.effect_size * (1 - np.exp(-x))
-        else:
-            raise ValueError(f"unknown effect_form {self.effect_form!r}")
-        out = np.minimum(self.base_win_prob + lift, P_CAP)
-        return float(out) if out.ndim == 0 else out
+        return win_prob(
+            donation, base=self.base_win_prob, size=self.effect_size, scale=self.effect_scale, form=self.effect_form
+        )
 
     def market_price(self, donation: float) -> float:
         """YES price. Efficient market that has priced in the donation."""
