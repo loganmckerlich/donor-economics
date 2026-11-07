@@ -2,7 +2,7 @@ import type { AssumptionsContent } from "@/components/AssumptionsPanel";
 
 export const ASSUMPTIONS_CONTENT: AssumptionsContent = {
   note:
-    "Examples use the default scenario: a $10M donation, $100M of YES bought at about 50%, a 2.7-point boost from $50M (about 1 point from $10M), sold after 3 months.",
+    "Examples use the default scenario: a $10M donation, $100M of YES bought at about 50%, a 2.7-point boost from $50M (about 1 point from $10M), sold after 3 months. The default market depth, fees, carry and half-life are illustrative placeholders, not measured from real markets: treat the results as showing how the pieces interact, not as a forecast.",
   assumptions: [
     {
       title: "One buy, one sell",

@@ -10,7 +10,7 @@
 | Maker / taker | Provider of resting liquidity / order that crosses the spread |
 | Spread | Best ask minus best bid |
 | Slippage | Difference between expected and executed price |
-| Price impact | Move in price caused by your order (assumed zero in the current model) |
+| Price impact | Move in price caused by your order. Zero in the Full Hedge model (the whole order fills at the quoted price); linear in the Marginal Profit model, set by market depth |
 | Kyle's lambda | Linear impact coefficient |
 | DCM | Designated Contract Market (CFTC-registered exchange) |
 | ECP | Eligible Contract Participant |
@@ -36,13 +36,29 @@
 | Effect scale `s` (`effect_scale`) | Dollar scale of the donation curve; default $10M |
 | Base win probability `p0` (`base_win_prob`) | Probability A wins with no donation |
 | Payoff if win `V` (`payoff_if_win`) | Amount the donor receives if and only if A wins |
-| Efficient market repricing | The market is assumed to price in the donation, so the YES price is `m = p(D)` and the NO hedge costs `1 - m` per share; the donor has no edge |
+| Efficient market repricing | In the Full Hedge model the market is assumed to price in the donation, so the YES price is `m = p(D)` and the NO hedge costs `1 - m` per share; the donor has no edge |
 | Donation EV (Expected gain from your donation) | `(p(D) - p(0))*V - D`: expected gain from donating relative to not donating (`donation_ev`), independent of the hedge in the model. "Expected gain from your donation" is the app's name for this same quantity |
 | Best donation (optimal donation) | The donation that maximises expected profit compared with not donating (`optimal_donation`). $0 means donating does not pay at those assumptions |
 | First-dollar return | Expected winnings from the first dollar donated, `V*k/s`, the same for every curve form. Donating only pays when it exceeds $1 |
 | Break-even payoff | The payoff at which the first-dollar return reaches $1, `V = s/k`. With the default boost of 2.7 points and s = $10M (k about 0.0151) it is roughly $660M |
-| Price impact (out of scope) | Move in price caused by your order; the model assumes the whole order fills at the quoted price, so impact, depth, fees and carry cost are possible extensions |
 | Basis risk | Hedge instrument imperfectly matching exposure (e.g. a market resolving on a different event than the policy payoff) |
+| Full Hedge Strategy | The app's first page: donate to raise the win probability, then buy NO to hedge. Profit is judged at the election result, so the question is how much risk the hedge removes |
+| Marginal Profit Strategy | The app's second page: buy YES, donate, and sell once the market has priced in the boost. There is no bet on the election itself; the profit is the price move on the YES contracts, and the donation is a sunk cost it has to earn back |
+| Market lag | The assumption the Marginal Profit Strategy rests on: the market prices in the donation slowly, after the donor has already bought. If traders anticipate the donation, the entry price already includes it and the profit disappears |
+| Money spent on YES (trade size) | Dollars used to buy YES contracts before the donation, `Q`. Shares bought are `Q / entry price`. Profit grows with `Q` until price impact takes over |
+| Hold time | Months between buying YES and selling it. The app's time axis runs from 0 to 12 months; the contract is assumed to stay open throughout, so there is no election result to worry about |
+| Market catch-up half-life | Months for the market to close half of the remaining gap between today's price and its eventual level. After `t` months the price is `p0 + (eventual - p0) * (1 - 0.5^(t / half-life))`. A half-life of 0 means the price jumps as soon as you have bought |
+| Market belief | The share of the true boost that the market ends up pricing: `eventual price = p0 + belief * (p(D) - p0)`. 100% means it agrees with the model, below 100% traders discount the donation's effect (a skeptical market) and above 100% they over-react |
+| Eventual price (target price) | The level the YES price is heading toward after the donation. It equals `p(D)` when market belief is 100% |
+| Market depth | Dollars of orders needed to move the price one point. The Marginal Profit model assumes impact is linear, so a trade of `Q` dollars moves the price `Q / depth` points and fills at the average of that move. Deep markets let you build a big position cheaply |
+| Slippage (Marginal Profit) | The cost of moving the price against yourself, paid on both the buy and the sell. Because impact is linear, it grows with the square of the order size |
+| Trading cost per side | Fees plus the bid-ask spread, as a share of the dollars traded. It is paid twice, once on the buy and once on the sell |
+| Carry (cost of tied-up cash) | What the money in YES could have earned elsewhere, as an annual rate: `Q * rate * months / 12`. It is why holding longer than the market needs is costly |
+| Price gain (before costs) | The frictionless gain on the position: shares bought at `p0` times the price rise by the time you sell, `(Q / p0) * (price at exit - p0)`. Slippage, fees, carry and the donation are then subtracted |
+| Net profit (Marginal Profit) | `price gain + slippage - fees - carry - donation`, compared with doing nothing. Negative means the price move did not earn back what the donation and the trade cost |
+| Break-even price move | The rise in the YES price needed just to cover the donation, fees, carry and slippage. The strategy only pays when the actual price move beats it. The app's figure is approximate because costs shift a little with the move |
+| Best sell time | The hold time with the highest profit when every other setting is as you have it: earlier loses part of the price move, later pays carry on a position that has already made its gain |
+| Best plan | The donation, trade size and sell time that earn the most together, searched within the slider ranges. If none earns more than $0, the best plan is to do nothing (the app says "Don't do it") |
 
 ## Sources (retrieved 2026-11-05; headline claims only, see individual files)
 Contribution limits

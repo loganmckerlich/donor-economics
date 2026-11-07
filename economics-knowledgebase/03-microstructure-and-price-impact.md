@@ -1,6 +1,6 @@
 # 03 Market Microstructure and Price Impact
 
-Model scope: **everything in this note is outside the current model's scope.** The model assumes no price impact and unlimited depth: the whole hedge fills at the quoted price `1 - m` (with `m = p(D)`), however large. This note is background for a possible price-impact extension.
+Model scope: **linear price impact is in the Marginal Profit model (`src/donor_economics/marginal_profit.py`) only; the rest of this note is outside both models.** The Full Hedge model assumes no price impact and unlimited depth: the whole hedge fills at the quoted price `1 - m` (with `m = p(D)`), however large. The Marginal Profit model uses the linear form below on both the buy and the sell. Signaling, manipulation and execution over time are outside both.
 
 ## Components of execution cost [Established]
 - **Spread:** best ask minus best bid; a taker pays half the spread.
@@ -12,7 +12,7 @@ Model scope: **everything in this note is outside the current model's scope.** T
 
 | Model | Form | Notes |
 |---|---|---|
-| Linear (Kyle 1985) | `Δp = λ * Q` | Equilibrium with informed trader and noise traders; the simplest candidate for a future extension (an earlier model version used it). Avg price = `c0 + H/(2*depth)`. |
+| Linear (Kyle 1985) | `Δp = λ * Q` | Equilibrium with informed trader and noise traders; the simplest candidate for a future extension of the Full Hedge model, and the form the Marginal Profit model uses. Avg price = `c0 + H/(2*depth)`. |
 | Square-root | `Δp ~ σ * sqrt(Q / V_daily)` | Widely reported empirical law in equities/futures (Almgren et al. 2005, Tóth et al. 2011, Bouchaud). Concave: cost grows slower than linear at large sizes. |
 | Order-book walk | Sum over actual levels | Best for a single known snapshot; needs data. |
 
@@ -32,7 +32,8 @@ Spend `H`, depth `L`: avg price `c0 + H/(2L)`; final marginal price `c0 + H/L`. 
 - 2024: some argued Polymarket whales skewed odds toward Trump ([DL News](https://dlnews.com/articles/defi/4-crypto-whales-are-skewing-trump-polymarket-election-bet/)); results of whether this affected votes are [Unverified/likely small].
 
 ## Implications for this project
-- Price impact is assumed away in the current model, which is a key reason the hedge is exactly zero-EV and a risk-averse donor fully hedges.
+- Price impact is assumed away in the Full Hedge model, which is a key reason the hedge is exactly zero-EV and a risk-averse donor fully hedges.
+- In the Marginal Profit model impact is the main cost of scale: slippage grows with the square of the order size, so profit rises with trade size and then falls. With $200M of depth per point, a $100M buy fills at an average of 0.25 points above the quote.
 - A future price-impact friction (linear `alpha`/`lambda`, or a sqrt option) would raise the average NO price above `1 - m`, making the hedge cost positive and growing with `H`. The optimal hedge for a risk-averse donor would then be partial, with the full hedge `H* = V*(1 - m)` rarely worthwhile at large `V`. Cost vs `H` could be plotted for both forms.
 - A future "signal cost" (the market reprices against the donor because the hedge is observed) would be a nuisance parameter that also lowers effective `effect_size` or credibility. This is a second-order effect that is not modelled.
 - Execution over time (multi-day TWAP) would reduce temporary impact but lengthen exposure to signaling and news; the current model is static and one-shot.
