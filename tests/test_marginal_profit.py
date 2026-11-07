@@ -1,12 +1,21 @@
+import math
 from dataclasses import replace
 
 import pytest
 
 from donor_economics import MarginalProfitScenario
-from donor_economics.marginal_profit import catch_up, evaluate, price_at, target_price
+from donor_economics.marginal_profit import (
+    break_even_capital,
+    break_even_months,
+    catch_up,
+    evaluate,
+    first_dollar_return,
+    price_at,
+    return_per_dollar,
+    target_price,
+)
 
-# Frictionless: no impact, fees or carry, so profit is just the price move on the shares minus D.
-FREE = dict(depth_per_point=1e18, fee_rate=0.0, carry_rate=0.0)
+STRONG = MarginalProfitScenario(effect_size=0.08 / math.log1p(5), donation=40e6, capital=500e6, hold_months=3.0)
 
 
 def test_catch_up_halves_the_gap_each_half_life():
@@ -24,80 +33,78 @@ def test_price_converges_to_belief_share_of_the_true_boost():
     assert price_at(m, 200) == pytest.approx(target_price(m))
 
 
-def test_frictionless_profit_is_price_gain_times_shares_minus_donation():
-    m = MarginalProfitScenario(**FREE, hold_months=2.0, half_life_months=1.0)
+def test_profit_is_price_gain_on_the_shares_minus_the_donation():
+    m = MarginalProfitScenario(hold_months=2.0, half_life_months=1.0)
     p0 = m.base_win_prob
     o = evaluate(m)
-    expected = (m.capital / p0) * (price_at(m, 2.0) - p0) - m.donation
-    assert o.profit == pytest.approx(expected)
-    assert o.slippage == pytest.approx(0, abs=1e-3) and o.fees == 0 and o.carry == 0
+    assert o.shares == pytest.approx(m.capital / p0)
+    assert o.price_gain == pytest.approx((m.capital / p0) * (price_at(m, 2.0) - p0))
+    assert o.profit == pytest.approx(o.price_gain - m.donation)
+    assert o.roi == pytest.approx(o.profit / (m.capital + m.donation))
 
 
-def test_breakdown_adds_up_to_profit():
+def test_default_scenario_hand_computed():
+    # k = 0.015, D = s = $10M: lift = 0.015 * ln 2 = 0.010397; 87.5% caught up after 3 months at a 1-month half-life.
     o = evaluate(MarginalProfitScenario())
-    assert o.gross_gain + o.slippage - o.fees - o.carry - o.donation == pytest.approx(o.profit)
+    move = 0.875 * 0.015 * math.log(2)
+    assert o.market_price == pytest.approx(0.5 + move)
+    assert o.price_gain == pytest.approx(200e6 * move)  # 200M contracts bought at 50 cents
+    assert o.profit == pytest.approx(200e6 * move - 10e6)
+    assert o.profit == pytest.approx(-8.1805e6, rel=1e-4)
 
 
-def test_no_donation_no_belief_means_only_costs():
-    base = MarginalProfitScenario()
-    o = evaluate(replace(base, donation=0.0))
-    assert o.market_price == pytest.approx(base.base_win_prob)
-    assert o.profit < 0  # fees, carry and slippage with nothing to gain
+def test_doing_nothing_earns_exactly_zero():
+    # no donation, no price move, and no frictions: nothing is earned or lost
+    assert evaluate(replace(STRONG, donation=0.0)).profit == pytest.approx(0)
+    assert evaluate(replace(STRONG, capital=0.0, donation=0.0)).profit == 0
 
 
-def test_more_depth_or_lower_costs_never_hurt():
-    m = MarginalProfitScenario(effect_size=0.08 / 1.79, donation=40e6, capital=500e6)
-    assert evaluate(replace(m, depth_per_point=1e9)).profit > evaluate(m).profit
-    assert evaluate(replace(m, fee_rate=0.0)).profit > evaluate(m).profit
-    assert evaluate(replace(m, carry_rate=0.0)).profit > evaluate(m).profit
+def test_profit_is_linear_in_position_size():
+    gain = lambda q: evaluate(replace(STRONG, capital=q)).price_gain  # noqa: E731
+    assert gain(200e6) == pytest.approx(2 * gain(100e6))
+    assert gain(1e9) == pytest.approx(10 * gain(100e6))
+    # no price impact: there is no size at which the return per dollar falls
+    assert return_per_dollar(replace(STRONG, capital=1e9)) == pytest.approx(return_per_dollar(STRONG))
 
 
 def test_slower_market_earns_less_at_a_fixed_hold():
-    m = MarginalProfitScenario(effect_size=0.05, hold_months=2.0)
+    m = replace(STRONG, hold_months=2.0)
     assert evaluate(replace(m, half_life_months=0.25)).profit > evaluate(replace(m, half_life_months=4.0)).profit
 
 
-def test_without_carry_waiting_never_hurts():
-    m = MarginalProfitScenario(effect_size=0.05, carry_rate=0.0)
-    profits = [evaluate(replace(m, hold_months=t)).profit for t in (0, 1, 3, 6, 12)]
+def test_waiting_never_hurts_because_it_costs_nothing():
+    profits = [evaluate(replace(STRONG, hold_months=t)).profit for t in (0, 1, 3, 6, 12)]
     assert profits == sorted(profits)
 
 
-# --- Cost mechanics, pinned to hand-computed numbers --------------------------------------------
-# A position with no donation effect (k = 0) sits at p0 = 0.5, so every cost can be worked out by hand.
-FLAT = dict(effect_size=0.0, donation=0.0, base_win_prob=0.5)
+def test_lower_belief_earns_less():
+    assert evaluate(replace(STRONG, belief=0.4)).profit < evaluate(STRONG).profit < evaluate(replace(STRONG, belief=2.0)).profit
 
 
-def test_entry_and_exit_price_impact_hand_computed():
-    # depth $100M per point, Q = $50M: buying moves the price 0.5 pts, so the average fill is 0.25 pts up.
-    m = MarginalProfitScenario(**FLAT, capital=50e6, depth_per_point=100e6, fee_rate=0.0, carry_rate=0.0)
-    o = evaluate(m)
-    assert o.entry_price == pytest.approx(0.5025)
-    # shares = 50e6 / 0.5025; selling them at 0.5 moves the price shares*0.5/(100e6*100) = 0.004975,
-    # so the average fill is half of that below the quote.
-    assert o.exit_price == pytest.approx(0.4975124, abs=1e-7)
-    assert o.profit == pytest.approx(o.shares * o.exit_price - 50e6)  # no fees, carry or donation
-    assert o.slippage == pytest.approx(o.profit)  # all of the loss is slippage
+def test_break_even_capital_is_where_profit_is_zero():
+    q = break_even_capital(STRONG)
+    assert q == pytest.approx(STRONG.donation / return_per_dollar(STRONG))
+    assert evaluate(replace(STRONG, capital=q)).profit == pytest.approx(0, abs=1e-3)
+    assert break_even_capital(replace(STRONG, donation=0.0)) is None  # the price never rises
 
 
-def test_fees_are_paid_on_both_the_buy_and_the_sell():
-    # No move and no impact: shares are bought and sold at 0.5, so proceeds == Q and fees == 2% of Q.
-    m = MarginalProfitScenario(**FLAT, capital=100e6, depth_per_point=1e18, fee_rate=0.01, carry_rate=0.0)
-    o = evaluate(m)
-    assert o.fees == pytest.approx(2e6)
-    assert o.profit == pytest.approx(-2e6)
+def test_break_even_months_is_where_profit_is_zero():
+    m = replace(STRONG, donation=40e6, half_life_months=4.0)
+    t = break_even_months(m)
+    assert t == pytest.approx(4.69, abs=0.01)
+    assert evaluate(replace(m, hold_months=t)).profit == pytest.approx(0, abs=1e-3)
 
 
-def test_carry_is_annual_rate_times_months_over_twelve():
-    m = MarginalProfitScenario(**FLAT, capital=120e6, depth_per_point=1e18, fee_rate=0.0, carry_rate=0.05, hold_months=6.0)
-    o = evaluate(m)
-    assert o.carry == pytest.approx(3e6)  # 120M * 5% * 6/12
-    assert o.profit == pytest.approx(-3e6)
+def test_break_even_months_edge_cases():
+    assert break_even_months(replace(STRONG, donation=0.0)) == 0.0  # nothing to earn back
+    assert break_even_months(replace(STRONG, capital=0.0)) is None  # nothing spent on YES
+    assert break_even_months(MarginalProfitScenario()) is None  # even a full catch-up gains less than the donation
+    assert break_even_months(replace(STRONG, half_life_months=0.0)) == 0.0  # instant market, profitable at once
+    assert break_even_months(replace(STRONG, belief=0.0)) is None  # the price never moves
 
 
-def test_slippage_grows_with_the_square_of_the_order_size():
-    def slip(q):
-        return -evaluate(MarginalProfitScenario(**FLAT, capital=q, depth_per_point=1e9, fee_rate=0.0, carry_rate=0.0)).slippage
-
-    ratio = slip(200e6) / slip(100e6)
-    assert 3.8 < ratio < 4.2  # linear impact: doubling the order roughly quadruples the cost
+@pytest.mark.parametrize("form", ["log", "linear", "saturating"])
+def test_first_dollar_return_is_the_slope_of_profit_at_zero_donation(form):
+    m = MarginalProfitScenario(effect_form=form, effect_size=0.02, capital=300e6, belief=0.8, hold_months=2.0)
+    slope = evaluate(replace(m, donation=1.0)).profit - evaluate(replace(m, donation=0.0)).profit
+    assert first_dollar_return(m) - 1 == pytest.approx(slope, rel=1e-3)

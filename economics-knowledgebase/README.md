@@ -8,7 +8,7 @@ Can a billionaire donor who gains `V` if candidate A wins, and donates `D` to A,
 ## The two models in brief
 **Full Hedge model.** Static, one binary contract. The donor receives `V` iff A wins; the donation `D` is a sunk cost. Win probability is `p(D) = min(p0 + k*ln(1 + D/s), 0.999)` by default. The market is efficient and reprices for the donation, so the YES price is `m = p(D)`, and the hedge buys NO at `1 - m`. Payoffs: win `V - D - H`; lose `-D + H*m/(1 - m)`. The donor has CARA utility (`a = 0` is risk-neutral).
 
-**Marginal Profit model.** The donor does not hold to the election or hedge. They buy `Q` dollars of YES at the pre-donation price `p0`, donate `D`, and sell after `hold` months. The market moves toward an eventual price `p0 + belief * (p(D) - p0)`, closing half the remaining gap every half-life. Orders move the price linearly (set by market depth), each side pays a flat fee, and the money in YES carries an annual cost. Profit is `proceeds - Q - fees - carry - D`, compared with doing nothing, and the risk is ignored. The two models share the donation effect curve `p(D)`.
+**Marginal Profit model.** The donor does not hold to the election or hedge. They buy `Q` dollars of YES at the pre-donation price `p0`, donate `D`, and sell after `hold` months. The market moves toward an eventual price `p0 + belief * (p(D) - p0)`, closing half the remaining gap every half-life. Like the Full Hedge model it is frictionless: orders fill at the quoted price, with no fees, spread, price impact or cost of cash. Profit is `(Q / p0) * (price at exit - p0) - D`, compared with doing nothing, and the risk is ignored. The two models share the donation effect curve `p(D)`.
 
 ## How the model maps to the topics
 
@@ -22,10 +22,9 @@ Can a billionaire donor who gains `V` if candidate A wins, and donates `D` to A,
 | `hedge` (H) decision | Dollars on NO at `1 - m`; full hedge `H* = V*(1 - m)` | [01 hedging](01-hedging-and-risk.md) |
 | Market price `m = p(D)` | Efficient market reprices for the donation (Full Hedge model) | [02 mechanics](02-prediction-market-mechanics.md), [06 quant](06-quantitative-methods.md) |
 | `belief`, `half_life_months` (Marginal Profit) | Share of the true boost the market ends up pricing, and how slowly it gets there | [02 mechanics](02-prediction-market-mechanics.md), [03 microstructure](03-microstructure-and-price-impact.md) |
-| `capital` (Q), `hold_months` (Marginal Profit) | Dollars spent on YES and months held before selling | [03 microstructure](03-microstructure-and-price-impact.md) |
-| `depth_per_point`, `fee_rate`, `carry_rate` (Marginal Profit) | Linear price impact, flat fee per side, annual cost of tied-up cash | [02 mechanics](02-prediction-market-mechanics.md), [03 microstructure](03-microstructure-and-price-impact.md) |
+| `capital` (Q), `hold_months` (Marginal Profit) | Dollars spent on YES and months held before selling | [03 microstructure](03-microstructure-and-price-impact.md) (what is left out) |
 
-**In the model:** hedging and risk aversion (01), the binary contract and efficient repricing (02), the donation effect (04), and expected utility (06). **In the Marginal Profit model only:** fees and depth (02), linear price impact (03) and carry. **Extensions (outside both models):** signaling and manipulation (03), position limits, legal, tax and platform risk (05), anticipation of the donation by other traders, and the calibration and Monte Carlo ideas (06). Notes 02, 03 and 05 are kept as background, and each has an "Implications" section mapping them onto the models.
+**In the model:** hedging and risk aversion (01), the binary contract and efficient repricing (02), the donation effect (04), and expected utility (06). **Extensions (outside both models):** fees and depth (02), price impact, signaling and manipulation (03), position limits, legal, tax and platform risk (05), anticipation of the donation by other traders, and the calibration and Monte Carlo ideas (06). Notes 02, 03 and 05 are kept as background, and each has an "Implications" section mapping them onto the models.
 
 ## Files
 1. [01-hedging-and-risk.md](01-hedging-and-risk.md): variance, utility, full vs partial hedges, why hedge at zero EV.

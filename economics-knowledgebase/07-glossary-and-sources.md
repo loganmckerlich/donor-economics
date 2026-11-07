@@ -10,7 +10,7 @@
 | Maker / taker | Provider of resting liquidity / order that crosses the spread |
 | Spread | Best ask minus best bid |
 | Slippage | Difference between expected and executed price |
-| Price impact | Move in price caused by your order. Zero in the Full Hedge model (the whole order fills at the quoted price); linear in the Marginal Profit model, set by market depth |
+| Price impact | Move in price caused by your order. Both models assume it is zero: the whole order fills at the quoted price, so impact, depth, fees and carry cost are possible extensions |
 | Kyle's lambda | Linear impact coefficient |
 | DCM | Designated Contract Market (CFTC-registered exchange) |
 | ECP | Eligible Contract Participant |
@@ -46,20 +46,18 @@
 | Marginal Profit Strategy | The app's second page: buy YES, donate, and sell once the market has priced in the boost. There is no bet on the election itself; the profit is the price move on the YES contracts, and the donation is a sunk cost it has to earn back |
 | Market manipulation | Trading, or acting, with intent to move a market price. The CFTC's anti-manipulation rules (CEA 6(c)(1), Rule 180.1) cover this. The Marginal Profit Strategy resembles it because its profit comes only from a price move the donor causes; whether a donation counts is untested |
 | Market lag | The assumption the Marginal Profit Strategy rests on: the market prices in the donation slowly, after the donor has already bought. If traders anticipate the donation, the entry price already includes it and the profit disappears |
-| Money spent on YES (trade size) | Dollars used to buy YES contracts before the donation, `Q`. Shares bought are `Q / entry price`. Profit grows with `Q` until price impact takes over |
-| Hold time | Months between buying YES and selling it. The app's time axis runs from 0 to 12 months; the contract is assumed to stay open throughout, so there is no election result to worry about |
+| Money spent on YES (trade size) | Dollars used to buy YES contracts before the donation, `Q`. Shares bought are `Q / p0`. With no fees or price impact, profit is a straight line in `Q` |
+| Hold time | Months between buying YES and selling it. The app's time axis runs from 0 to 12 months; the contract is assumed to stay open throughout, so there is no election result to worry about. Waiting costs nothing in the model, so a longer hold only helps |
 | Market catch-up half-life | Months for the market to close half of the remaining gap between today's price and its eventual level. After `t` months the price is `p0 + (eventual - p0) * (1 - 0.5^(t / half-life))`. A half-life of 0 means the price jumps as soon as you have bought |
 | Market belief | The share of the true boost that the market ends up pricing: `eventual price = p0 + belief * (p(D) - p0)`. 100% means it agrees with the model, below 100% traders discount the donation's effect (a skeptical market) and above 100% they over-react |
 | Eventual price (target price) | The level the YES price is heading toward after the donation. It equals `p(D)` when market belief is 100% |
-| Market depth | Dollars of orders needed to move the price one point. The Marginal Profit model assumes impact is linear, so a trade of `Q` dollars moves the price `Q / depth` points and fills at the average of that move. Deep markets let you build a big position cheaply |
-| Slippage (Marginal Profit) | The cost of moving the price against yourself, paid on both the buy and the sell. Because impact is linear, it grows with the square of the order size |
-| Trading cost per side | Fees plus the bid-ask spread, as a share of the dollars traded. It is paid twice, once on the buy and once on the sell |
-| Carry (cost of tied-up cash) | What the money in YES could have earned elsewhere, as an annual rate: `Q * rate * months / 12`. It is why holding longer than the market needs is costly |
-| Price gain (before costs) | The frictionless gain on the position: shares bought at `p0` times the price rise by the time you sell, `(Q / p0) * (price at exit - p0)`. Slippage, fees, carry and the donation are then subtracted |
-| Net profit (Marginal Profit) | `price gain + slippage - fees - carry - donation`, compared with doing nothing. Negative means the price move did not earn back what the donation and the trade cost |
-| Break-even price move | The rise in the YES price needed just to cover the donation, fees, carry and slippage. The strategy only pays when the actual price move beats it. The app's figure is approximate because costs shift a little with the move |
-| Best sell time | The hold time with the highest profit when every other setting is as you have it: earlier loses part of the price move, later pays carry on a position that has already made its gain |
-| Best plan | The donation, trade size and sell time that earn the most together, searched within the slider ranges. If none earns more than $0, the best plan is to do nothing (the app says "Don't do it") |
+| Price gain on YES | The gain on the position: shares bought at `p0` times the price rise by the time you sell, `(Q / p0) * (price at exit - p0)`. The donation is then subtracted to give net profit |
+| Net profit (Marginal Profit) | `price gain - donation`, compared with doing nothing. Negative means the price move did not earn back what the donation cost |
+| Return per dollar | The gain per dollar spent on YES, `(price at exit - p0) / p0`. Net profit is this times `Q`, minus the donation |
+| Break-even trade size | The smallest position that earns the donation back, `donation / return per dollar`. Below it the plan loses; above it, profit grows in a straight line |
+| Break-even price move | The rise in the YES price needed to earn the donation back, `donation / contracts held`. The strategy only pays when the actual price move beats it |
+| Time to break even | The hold time at which net profit reaches $0. "Never" means that even if the market closed the whole gap, the gain would still be smaller than the donation |
+| First-dollar return (Marginal Profit) | Expected gain from the first donated dollar, `(Q / p0) * belief * share of the move captured * k / s`. A donation only pays when it exceeds $1, like `V*k/s` in the Full Hedge model |
 
 ## Sources (retrieved 2026-11-05; headline claims only, see individual files)
 Contribution limits

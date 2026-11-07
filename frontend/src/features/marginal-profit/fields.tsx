@@ -16,11 +16,11 @@ export const TIPS: Record<ParamId, [string, string]> = {
   ],
   capital: [
     "Money spent on YES",
-    "Dollars used to buy YES contracts before the donation. Profit grows with this, but buying more moves the price against you (and selling does too), so returns fade and then turn negative.",
+    "Dollars used to buy YES contracts before the donation. Each dollar earns the same return, so profit grows in a straight line with this (the model has no fees and no price impact). The donation is a fixed cost, so a bigger position is what earns it back.",
   ],
   hold: [
     "Hold time",
-    "Months between buying YES and selling it. Too early and the market has not caught up; too late and you are paying carry on money that has already made its gain.",
+    "Months between buying YES and selling it. Waiting costs nothing in this model, so a longer hold only helps: it just takes time for the market to catch up. Sell too early and you leave part of the move behind.",
   ],
   halfLife: [
     "Market catch-up half-life",
@@ -41,18 +41,6 @@ export const TIPS: Record<ParamId, [string, string]> = {
   effectScale: [
     "Effect scale (s)",
     "The dollar size at which returns start to fade. A small s means the first few million do most of the work. The boost from $50M stays fixed; this only changes how it is spread across smaller and larger donations.",
-  ],
-  depth: [
-    "Market depth",
-    "Dollars of orders needed to move the price one point. A deep market (large number) lets you build a big position without moving the price against yourself; a thin one eats the profit. Price impact is assumed linear.",
-  ],
-  fee: [
-    "Trading cost per side",
-    "Fees plus the bid-ask spread, as a share of the dollars traded. You trade twice (buy and sell), so it is paid twice.",
-  ],
-  carry: [
-    "Cost of tied-up cash",
-    "What the money in YES could have earned elsewhere, per year. It is charged on the dollars spent on YES for as long as you hold them.",
   ],
 };
 

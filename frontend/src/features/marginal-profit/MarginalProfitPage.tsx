@@ -1,10 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import ApiError from "@/components/ApiError";
 import AssumptionsPanel from "@/components/AssumptionsPanel";
 import { Mini, Section } from "@/components/Blocks";
 import ChartCard from "@/components/ChartCard";
-import ApiError from "@/components/ApiError";
 import { AdvancedGroup, ControlCtx } from "@/components/Controls";
 import Heatmap from "@/components/Heatmap";
 import LineChart, { type Series } from "@/components/LineChart";
@@ -23,8 +23,7 @@ const CAT = ["var(--series-1)", "var(--series-2)", "var(--series-3)"];
 const m0 = (v: number) => `$${(v / 1e6).toFixed(0)}M`;
 const months = (v: number) => `${+v.toFixed(1)} mo`;
 const pts = (v: number) => `${v >= 0 ? "+" : "−"}${Math.abs(v * 100).toFixed(1)} pts`;
-const roundSig = (x: number) => { const mag = 10 ** (Math.floor(Math.log10(x)) - 1); return Math.round(x / mag) * mag; };
-const sig = (a: MarginalAnalysis) => JSON.stringify([a.outcome, a.strategy.best_plan]);
+const sig = (a: MarginalAnalysis) => JSON.stringify([a.outcome, a.strategy.optimal_donation]);
 
 export default function MarginalProfitPage() {
   const [ui, setUi] = useState<UiState>(DEFAULT_UI);
@@ -56,9 +55,6 @@ export default function MarginalProfitPage() {
       hold_months: ui.hold,
       half_life_months: ui.halfLife,
       belief: ui.belief,
-      depth_per_point: ui.depth,
-      fee_rate: ui.fee,
-      carry_rate: ui.carry,
     }),
     [ui],
   );
@@ -77,24 +73,24 @@ export default function MarginalProfitPage() {
     setGhost(dataRef.current);
     setUi(presetState(PRESETS[i]));
   };
-  const applyBest = () => {
-    if (!data || data.strategy.best_plan.profit <= 0) return;
-    const b = data.strategy.best_plan;
+  const applyBestDonation = () => {
+    if (!data) return;
     setGhost(data);
-    set({ donation: b.donation, capital: b.capital, hold: b.hold_months });
+    set({ donation: data.strategy.optimal_donation });
   };
 
   return (
     <ControlCtx.Provider value={ctx}>
-      <SummaryBar d={data} onApply={applyBest} hasGhost={!!visibleGhost} onClearGhost={() => setGhost(null)} />
+      <SummaryBar d={data} donation={ui.donation} onApply={applyBestDonation} hasGhost={!!visibleGhost} onClearGhost={() => setGhost(null)} />
       <div className="mx-auto max-w-[1400px] space-y-8 px-4 py-6 sm:px-6">
         <header>
           <h1 className="text-2xl font-semibold text-ink">Marginal profit strategy</h1>
           <p className="mt-1 max-w-3xl text-sm text-ink-2">
             Instead of hedging, the donor <em>trades</em> the donation. They buy YES contracts, donate to raise the candidate&apos;s
             odds, and sell after a few months once the market has noticed. The profit is the price move on the YES contracts;
-            the donation is a cost it has to earn back. There is no bet on the election itself, and time matters: the market
-            catches up gradually, and holding costs money. Each section has its own sliders beside the charts they drive.
+            the donation is a cost it has to earn back. There is no bet on the election itself. Time matters because the
+            market catches up gradually. The market is otherwise frictionless: orders fill at the quoted price, with no fees.
+            Each section has its own sliders beside the charts they drive.
           </p>
           <div role="note" className="mt-3 max-w-3xl rounded-lg border border-series-2 bg-surface px-4 py-3 text-sm text-ink-2">
             <strong className="font-semibold text-ink">Legal caution.</strong> Buying YES, then making a donation expected to raise
@@ -107,8 +103,8 @@ export default function MarginalProfitPage() {
             <ul className="mt-1.5 list-disc space-y-1 pl-5">
               <li>The donor buys <strong className="font-semibold text-ink">before anyone reacts</strong>: nobody else trades on the donation, or anticipates it. The donor knows first because the donor is the cause.</li>
               <li>The price moves <strong className="font-semibold text-ink">only because of the donation</strong>, closing half the gap every half-life. No other news or noise.</li>
-              <li>Price impact is linear; fees and the cost of tied-up cash are flat rates. One buy and one sell, with the contract open throughout.</li>
-              <li>Depth, fees, carry and half-life defaults are <strong className="font-semibold text-ink">illustrative, not measured</strong> from real markets.</li>
+              <li><strong className="font-semibold text-ink">No frictions</strong>: any order fills at the quoted price, with no fees, price impact or cost of cash. So profit grows in a straight line with position size, and there is no cost to waiting. One buy and one sell.</li>
+              <li>The half-life and market-belief defaults are <strong className="font-semibold text-ink">illustrative, not measured</strong> from real markets.</li>
             </ul>
             <p className="mt-2 text-xs text-ink-3">The full list, with examples and what is left out, is in Model assumptions below.</p>
           </div>
@@ -126,12 +122,12 @@ export default function MarginalProfitPage() {
 }
 
 function SummaryBar({
-  d, onApply, hasGhost, onClearGhost,
-}: { d: MarginalAnalysis | null; onApply: () => void; hasGhost: boolean; onClearGhost: () => void }) {
+  d, donation, onApply, hasGhost, onClearGhost,
+}: { d: MarginalAnalysis | null; donation: number; onApply: () => void; hasGhost: boolean; onClearGhost: () => void }) {
   const o = d?.outcome;
   const st = d?.strategy;
-  const plan = st?.best_plan;
-  const pays = !!plan && plan.profit > 0;
+  const be = st?.break_even_months;
+  const canApply = !!st && Math.abs(st.optimal_donation - donation) > 0.5e6;
   return (
     <div className="z-20 border-b border-grid bg-surface/95 sm:sticky sm:top-0 sm:backdrop-blur">
       <div className="mx-auto grid max-w-[1400px] grid-cols-2 items-start gap-x-6 gap-y-3 px-4 py-2.5 sm:px-6 lg:grid-cols-[repeat(4,minmax(0,1fr))_auto]">
@@ -141,8 +137,9 @@ function SummaryBar({
           sub={o ? `${(o.roi * 100).toFixed(1)}% on ${moneyShort(o.donation + (d?.scenario.capital ?? 0))} deployed` : undefined}
           tip={
             <T title="Net profit">
-              What the plan earns compared with doing nothing: the price gain on the YES contracts, minus slippage, fees,
-              carry and the donation. Negative means the trade does not earn back what the donation cost.
+              What the plan earns compared with doing nothing: the price gain on the YES contracts minus the donation.
+              Negative means the price move does not earn back what the donation cost. It equals
+              shares × (sale price − purchase price) − D.
             </T>
           }
         />
@@ -150,52 +147,61 @@ function SummaryBar({
           label="Price move"
           align="right"
           value={st ? pts(st.price_move) : "…"}
-          sub={st ? `Needs ${pts(st.needed_move)} to break even` : undefined}
+          sub={st ? (st.needed_move === null ? "Nothing spent on YES" : `Needs ${pts(st.needed_move)} to break even`) : undefined}
           tip={
             <T title="Price move">
-              How far the YES price has risen by the time you sell, against the rise needed just to cover the donation, fees,
-              carry and slippage. Profit needs the first number to beat the second. The break-even figure is approximate.
+              How far the YES price has risen by the time you sell, against the rise needed to earn back the donation
+              (the donation divided by the number of contracts you hold). Profit needs the first number to beat the second.
             </T>
           }
         />
         <Mini
-          label="Best time to sell"
-          value={st ? months(st.optimal_hold) : "…"}
-          sub={st ? `${money(st.optimal_hold_profit)} at your other settings` : undefined}
-          tip={
-            <T title="Best time to sell">
-              The hold time that earns the most with every other slider where you have it. Earlier loses part of the price
-              move; later pays carry on a position that has already made its gain.
-            </T>
-          }
-        />
-        <Mini
-          label="Best plan"
-          align="right"
-          value={plan ? (pays ? money(plan.profit) : "Don't do it") : "…"}
+          label="Time to break even"
+          value={st ? (be === null || be === undefined ? "Never" : months(be)) : "…"}
           sub={
-            plan
-              ? pays
-                ? `Give ${moneyShort(plan.donation)}, buy ${moneyShort(plan.capital)}, sell at ${months(plan.hold_months)}`
-                : "No donation or trade size beats doing nothing"
+            st
+              ? be === null || be === undefined
+                ? "The market never closes enough of the gap"
+                : be === 0
+                  ? "Nothing to earn back"
+                  : "Hold at least this long to earn back the donation"
               : undefined
           }
           tip={
-            <T title="Best plan">
-              The donation, trade size and sell time that earn the most together, searched within the slider ranges, with
-              the other assumptions as you have set them. If none earn more than $0, doing nothing is the best plan.
-              Results at the edge of a slider range are limited by that range.
+            <T title="Time to break even">
+              The hold time at which profit reaches $0. Waiting costs nothing here, so selling later only helps, but the
+              market only closes part of the gap with time. &ldquo;Never&rdquo; means that even if the market closed the whole
+              gap, the gain would still be smaller than the donation.
+            </T>
+          }
+        />
+        <Mini
+          label="Best donation"
+          align="right"
+          value={st ? (st.optimal_donation > 0 ? moneyShort(st.optimal_donation) : "Don't donate") : "…"}
+          sub={
+            st
+              ? st.optimal_donation > 0
+                ? `Adds ${money(st.optimal_donation_profit)} at your trade size and sell time`
+                : "No donation size pays at your trade size and sell time"
+              : undefined
+          }
+          tip={
+            <T title="Best donation">
+              The donation that earns the most, with the trade size and sell time where you have set them. $0 means that
+              every donated dollar returns less than a dollar through the price move, so the best move is to give nothing.
+              A bigger position or a faster market raises it.
             </T>
           }
         />
         <div className="col-span-2 flex items-center gap-3 lg:col-span-1">
           <Tip
             align="right" width="w-72" side="bottom"
-            content={<T title="Apply best plan">Sets the donation, trade size and sell time to the best plan. Your previous charts stay behind as dotted lines.</T>}
+            content={<T title="Apply best donation">Sets the donation to the best amount for your trade size and sell time. Your previous charts stay behind as dotted lines.</T>}
           >
-            <button onClick={onApply} disabled={!pays}
+            <button onClick={onApply} disabled={!canApply}
               className="rounded-lg bg-series-1 px-3 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">
-              Apply best plan
+              Apply best donation
             </button>
           </Tip>
           {hasGhost && (
@@ -212,10 +218,7 @@ function SummaryBar({
 /** Where the money goes: each item is signed, so the bars and the +/− text never rely on colour alone. */
 function Breakdown({ o }: { o: MarginalOutcome }) {
   const rows = [
-    { label: "Price gain (before costs)", v: o.gross_gain },
-    { label: "Slippage", v: o.slippage },
-    { label: "Fees", v: -o.fees },
-    { label: "Carry", v: -o.carry },
+    { label: "Price gain on YES", v: o.price_gain },
     { label: "Donation", v: -o.donation },
   ];
   const total = { label: "Net profit", v: o.profit };
@@ -241,7 +244,7 @@ function Breakdown({ o }: { o: MarginalOutcome }) {
     <div className="rounded-xl border border-grid bg-surface p-4">
       <h3 className="text-base font-semibold text-ink">Where the money goes</h3>
       <p className="mb-3 mt-1 text-sm text-ink-2">
-        The price gain has to cover everything else. Bars to the right earn money; bars to the left cost it.
+        The price gain has to earn back the donation. Bars to the right earn money; bars to the left cost it.
       </p>
       <ul className="space-y-2">
         {rows.map((r) => row(r))}
@@ -256,7 +259,6 @@ function Sections({
 }: { d: MarginalAnalysis; ghost: MarginalAnalysis | null; ui: UiState; active: ParamId | null; set: (p: Partial<UiState>) => void }) {
   const o = d.outcome;
   const st = d.strategy;
-  const plan = st.best_plan;
   const tc = d.curves.time;
   const dc = d.curves.donation;
   const cc = d.curves.capital;
@@ -264,7 +266,8 @@ function Sections({
   const caught = ui.halfLife <= 0 ? 1 : 1 - 0.5 ** (ui.hold / ui.halfLife);
   const dflt = DEFAULT_UI;
   const advancedA = ui.baseProb !== dflt.baseProb || ui.effectForm !== dflt.effectForm || ui.effectScale !== dflt.effectScale;
-  const advancedB = ui.depth !== dflt.depth || ui.fee !== dflt.fee || ui.carry !== dflt.carry;
+  const be = st.break_even_months;
+  const beQ = st.break_even_capital;
 
   const verdict = (
     <>
@@ -276,18 +279,30 @@ function Sections({
       ) : (
         <>
           <strong>This plan loses {money(-o.profit)}.</strong> By month {+ui.hold.toFixed(1)} the market has closed {pct(caught, 0)} of
-          the gap and the price is up {pts(st.price_move)}, but the position needs {pts(st.needed_move)} to cover the donation,
-          fees, carry and slippage.
+          the gap and the price is up {pts(st.price_move)}
+          {st.needed_move === null ? "." : <>, but the position needs {pts(st.needed_move)} to earn back the donation.</>}
         </>
       )}{" "}
-      {plan.profit > 0 ? (
+      {beQ !== null ? (
         <>
-          The best plan found: give <strong>{moneyShort(plan.donation)}</strong>, buy <strong>{moneyShort(plan.capital)}</strong> of YES
-          and sell after <strong>{months(plan.hold_months)}</strong> to earn <strong>{money(plan.profit)}</strong>.
+          Each dollar in YES earns {pct(st.return_per_dollar)}, so the donation is earned back at{" "}
+          <strong>{moneyShort(beQ)}</strong> of YES (you have {moneyShort(ui.capital)}).
         </>
       ) : (
-        <>At these assumptions <strong>no donation or trade size beats doing nothing.</strong></>
-      )}
+        <>The price has not risen, so no position size would earn back the donation.</>
+      )}{" "}
+      {st.optimal_donation === 0 ? (
+        <>
+          <strong>Don&apos;t donate at this size.</strong> The first donated dollar returns only{" "}
+          <strong>${st.first_dollar_return.toFixed(2)}</strong>, and returns fall from there.
+        </>
+      ) : (
+        <>
+          <strong>The best donation is {moneyShort(st.optimal_donation)}</strong>, adding {money(st.optimal_donation_profit)} (the first
+          dollar returns ${st.first_dollar_return.toFixed(2)}).
+        </>
+      )}{" "}
+      There are no fees or price impact in this model, so profit grows without limit as the position grows.
     </>
   );
 
@@ -299,7 +314,7 @@ function Sections({
 
   const holdLines = [
     { x: ui.hold, label: "Your sale" },
-    ...(Math.abs(st.optimal_hold - ui.hold) > 0.3 ? [{ x: st.optimal_hold, label: "Best" }] : []),
+    ...(be !== null && be > 0 && Math.abs(be - ui.hold) > 0.3 ? [{ x: be, label: "Break even" }] : []),
   ];
   const donationLines = [
     { x: ui.donation, label: "Your donation" },
@@ -307,7 +322,7 @@ function Sections({
   ];
   const capitalLines = [
     { x: ui.capital, label: "Your trade" },
-    ...(st.optimal_capital > 0 && Math.abs(st.optimal_capital - ui.capital) > 20e6 ? [{ x: st.optimal_capital, label: "Best" }] : []),
+    ...(beQ !== null && beQ > 0 && Math.abs(beQ - ui.capital) > 20e6 ? [{ x: beQ, label: "Break even" }] : []),
   ];
 
   const donationSlider = (
@@ -331,7 +346,7 @@ function Sections({
       <Breakdown o={o} />
 
       <Section letter="A" title="How does the price move over time?"
-        question="The donation lifts the true win chance; the market takes time to follow. When should the donor sell?"
+        question="The donation lifts the true win chance; the market takes time to follow. How long until the donation is earned back?"
         controls={
           <>
             <MSlider param="boost" label="Boost from a $50M donation" value={ui.boost} min={0} max={0.2} step={0.001}
@@ -368,41 +383,35 @@ function Sections({
         </ChartCard>
 
         <ChartCard n={2} ringed={ringed(2)} title="Profit by when you sell"
-          takeaway={<>Selling early leaves price gain behind; selling late pays carry on money that has already made its gain. The best time to sell is <strong>{months(st.optimal_hold)}</strong>.</>}>
+          takeaway={
+            be === null
+              ? <>Profit never reaches zero: even if the market closed the whole gap, the gain would be smaller than the donation.</>
+              : be === 0
+                ? <>There is no donation to earn back, so every sale time is profitable.</>
+                : <>Profit rises as the market catches up and breaks even after <strong>{months(be)}</strong>. Waiting costs nothing here, so a longer hold only helps; the curve flattens once the market has caught up.</>
+          }>
           <LineChart
-            ariaLabel="Net profit by hold time, and the same before fees and carry"
+            ariaLabel="Net profit by hold time"
             x={tc.months}
-            series={[
-              { key: "net", label: "Net profit", color: CAT[0], y: tc.profit },
-              { key: "pre", label: "Before fees and carry", color: CAT[1], y: tc.profit_before_costs, dashed: true },
-              ...ghostHold,
-            ]}
+            series={[{ key: "net", label: "Net profit", color: CAT[0], y: tc.profit }, ...ghostHold]}
             xFormat={months} yFormat={moneyShort} xTitle="Hold time" yTitle="Profit vs doing nothing"
             zeroLine vlines={holdLines} />
         </ChartCard>
       </Section>
 
       <Section letter="B" title="How big should the trade be?"
-        question="A bigger donation moves the price more; a bigger position earns more from each point. But both cost money, and large orders move the price against you."
+        question="A bigger donation moves the price more; a bigger position earns more from each point. With no fees or price impact, profit grows in a straight line with the position."
         controls={
           <>
             {donationSlider}
             {capitalSlider}
             {holdSlider}
-            <AdvancedGroup modified={advancedB}>
-              <MSlider param="depth" label="Market depth" value={Math.log10(ui.depth)} min={Math.log10(5e6)} max={Math.log10(2e9)} step={0.01}
-                display={`${moneyShort(ui.depth)} per point`} onChange={(v) => set({ depth: roundSig(10 ** v) })} />
-              <MSlider param="fee" label="Trading cost per side" value={ui.fee} min={0} max={0.03} step={0.001}
-                display={`${(ui.fee * 100).toFixed(1)}%`} onChange={(v) => set({ fee: v })} />
-              <MSlider param="carry" label="Cost of tied-up cash (per year)" value={ui.carry} min={0} max={0.2} step={0.005}
-                display={`${(ui.carry * 100).toFixed(1)}%`} onChange={(v) => set({ carry: v })} />
-            </AdvancedGroup>
           </>
         }>
         <ChartCard n={3} ringed={ringed(3)} title="Profit by donation size"
           takeaway={
             st.optimal_donation > 0
-              ? <>With your trade size and sell time, the best donation is <strong>{moneyShort(st.optimal_donation)}</strong> ({money(st.optimal_donation_profit)}).</>
+              ? <>With your trade size and sell time, the best donation is <strong>{moneyShort(st.optimal_donation)}</strong> ({money(st.optimal_donation_profit)}). The peak is where one more donated dollar stops returning a dollar.</>
               : <>At your trade size and sell time, no donation size makes the trade pay.</>
           }>
           <LineChart
@@ -415,18 +424,14 @@ function Sections({
 
         <ChartCard n={4} ringed={ringed(4)} title="Profit by trade size"
           takeaway={
-            st.optimal_capital > 0
-              ? <>Profit rises with the money in YES until price impact takes over. The best trade size is <strong>{moneyShort(st.optimal_capital)}</strong>.</>
-              : <>At your donation and sell time, no trade size earns back the donation.</>
+            beQ !== null
+              ? <>Each dollar in YES earns <strong>{pct(st.return_per_dollar)}</strong>, so profit rises in a straight line. The donation is earned back at <strong>{moneyShort(beQ)}</strong> of YES.</>
+              : <>The price has not risen, so no trade size earns back the donation.</>
           }>
           <LineChart
-            ariaLabel="Net profit by money spent on YES, and the same before fees and carry"
+            ariaLabel="Net profit by money spent on YES"
             x={cc.capital}
-            series={[
-              { key: "net", label: "Net profit", color: CAT[0], y: cc.profit },
-              { key: "pre", label: "Before fees and carry", color: CAT[1], y: cc.profit_before_costs, dashed: true },
-              ...ghostCap,
-            ]}
+            series={[{ key: "net", label: "Net profit", color: CAT[0], y: cc.profit }, ...ghostCap]}
             xFormat={moneyShort} yFormat={moneyShort} xTitle="Money spent on YES" yTitle="Profit vs doing nothing"
             zeroLine vlines={capitalLines} />
         </ChartCard>
@@ -435,7 +440,7 @@ function Sections({
       <Section letter="C" title="Where does it pay?"
         question="How the answer changes across the time assumptions, and across the two dollar levers.">
         <ChartCard n={5} ringed={ringed(5)} title="When does timing pay?"
-          takeaway={<>Profit by hold time and by how slowly the market reacts. A slow market needs a long hold, and a long hold pays carry. {noPay}</>}>
+          takeaway={<>Profit by hold time and by how slowly the market reacts. A slow market needs a long hold. {noPay}</>}>
           <Heatmap
             ariaLabel="Net profit by hold time and market catch-up half-life"
             xs={d.sweeps.time.hold_months} ys={d.sweeps.time.half_life_months} z={d.sweeps.time.profit} yScale="log"

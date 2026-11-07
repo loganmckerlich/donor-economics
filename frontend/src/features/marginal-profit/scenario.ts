@@ -12,9 +12,6 @@ export interface UiState {
   baseProb: number;
   effectForm: EffectForm;
   effectScale: number; // $
-  depth: number; // $ of orders that move the price one point
-  fee: number; // per side, share of dollars traded
-  carry: number; // annual cost of the cash tied up
 }
 
 export const DEFAULT_UI: UiState = {
@@ -27,14 +24,11 @@ export const DEFAULT_UI: UiState = {
   baseProb: 0.5,
   effectForm: "log",
   effectScale: 10e6,
-  depth: 200e6,
-  fee: 0.01,
-  carry: 0.05,
 };
 
 export type ParamId =
   | "boost" | "donation" | "capital" | "hold" | "halfLife" | "belief"
-  | "baseProb" | "effectForm" | "effectScale" | "depth" | "fee" | "carry";
+  | "baseProb" | "effectForm" | "effectScale";
 
 export const CHART_TITLES: Record<number, string> = {
   1: "Price over time",
@@ -59,8 +53,5 @@ export const AFFECTS: Record<ParamId, Record<number, Kind>> = {
   halfLife: { 1: "curve", 2: "curve", 3: "curve", 4: "curve", 5: "marker", 6: "curve" },
   hold: { 1: "marker", 2: "marker", 3: "curve", 4: "curve", 5: "marker", 6: "curve" },
   capital: { 2: "curve", 3: "curve", 4: "marker", 5: "curve", 6: "marker" },
-  depth: { 2: "curve", 3: "curve", 4: "curve", 5: "curve", 6: "curve" },
-  fee: { 2: "curve", 3: "curve", 4: "curve", 5: "curve", 6: "curve" },
-  carry: { 2: "curve", 3: "curve", 4: "curve", 5: "curve", 6: "curve" },
 };
 export const affectedCharts = (p: ParamId) => Object.keys(AFFECTS[p]).map(Number);

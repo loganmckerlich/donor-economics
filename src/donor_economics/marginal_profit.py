@@ -1,4 +1,4 @@
-"""Marginal profit strategy: buy YES, donate, sell once the market has moved.
+"""Marginal profit strategy: buy YES, donate, sell once the market has priced in the boost.
 
 The donor does not hold to the election and does not hedge. They buy YES contracts at the
 current price, make the donation, wait ``hold`` months, then sell. The donation raises the
@@ -6,7 +6,7 @@ true win probability from p0 to p(D); the market takes time to notice. The trade
 the part of that move that has shown up in the price by the time they sell. The donation
 itself is a sunk cost that the trade has to earn back.
 
-Heavy simplifications (see README):
+Assumptions (see README.md), in the same spirit as the Full Hedge model:
   * One entry, one exit. YES is bought at the pre-donation price p0, the donation lands
     immediately, and the position is closed after ``hold`` months. Resolution risk is ignored.
   * The market only ever moves because of the donation: no other news, drift or noise.
@@ -14,16 +14,18 @@ Heavy simplifications (see README):
     ``half_life`` months.
   * The market ends up pricing ``belief`` of the true boost (1 = all of it, 0.5 = it only half
     believes the donation matters, 1.5 = it over-reacts).
-  * Price impact is linear in order size; each fill gets the average of the move it causes.
-  * Fees are a flat share of traded dollars on each side; cash costs a fixed annual rate.
+  * No frictions: orders fill at the quoted price at any size, with no fees, no spread, no
+    price impact and no cost of tying up cash. So profit is linear in the size of the position.
+  * The donor judges the plan by its profit compared with doing nothing, ignoring risk.
 
-Money flows, with ``Q`` dollars of YES bought at fill price ``e`` (so ``N = Q / e`` shares),
-sold at fill price ``x``:
-    profit = N * x - Q - fees - carry - D
+Money flows, with ``Q`` dollars of YES bought at ``p0`` (so ``N = Q / p0`` shares) and sold at
+the market price ``m`` after ``hold`` months:
+    profit = N * (m - p0) - D
 """
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 from .effect import P_CAP, win_prob
@@ -40,10 +42,6 @@ class MarginalProfitScenario:
     hold_months: float = 3.0  # time between buying and selling
     half_life_months: float = 1.0  # time for the market to close half the remaining gap
     belief: float = 1.0  # share of the true boost the market ends up pricing
-    depth_per_point: float = 50e6  # $ of orders that move the price one point (0.01)
-    fee_rate: float = 0.01  # per side, share of dollars traded (fees + spread)
-    carry_rate: float = 0.05  # annual opportunity cost of the cash tied up in YES
-
 
     def win_prob(self, donation: float) -> float:
         """True win probability after donating ``donation``."""
@@ -54,18 +52,13 @@ class MarginalProfitScenario:
 
 @dataclass(frozen=True)
 class MarginalProfitOutcome:
-    entry_price: float  # average fill when buying
-    exit_price: float  # average fill when selling
-    market_price: float  # quoted price at exit, before the sale moves it
+    market_price: float  # YES price when selling
     target_price: float  # price the market is converging to
     true_prob: float  # win probability with the donation
-    shares: float
-    gross_gain: float  # frictionless: shares bought at p0, sold at the market price
-    slippage: float  # negative: cost of moving the price on the way in and out
-    fees: float  # positive number, subtracted
-    carry: float  # positive number, subtracted
-    donation: float  # positive number, subtracted
-    profit: float
+    shares: float  # contracts bought, Q / p0
+    price_gain: float  # shares * (market price - p0)
+    donation: float  # subtracted
+    profit: float  # price gain - donation, compared with doing nothing
     roi: float  # profit / (capital + donation)
 
 
@@ -90,34 +83,57 @@ def price_at(m: MarginalProfitScenario, months: float) -> float:
 
 def evaluate(m: MarginalProfitScenario) -> MarginalProfitOutcome:
     p0 = m.base_win_prob
-    tgt = target_price(m)
-    mkt = p0 + (tgt - p0) * catch_up(m.hold_months, m.half_life_months)
-    q = m.capital
-    per_dollar = 1.0 / (m.depth_per_point * 100.0)  # price move per $ of orders
-
-    entry = min(p0 + 0.5 * q * per_dollar, P_CAP)  # linear impact: average of the move
-    shares = q / entry
-    exit_move = shares * mkt * per_dollar  # exit order size, in dollars, times impact
-    exit_ = max(mkt - 0.5 * exit_move, 0.0)
-    proceeds = shares * exit_
-
-    gross = (q / p0) * (mkt - p0)
-    slippage = (proceeds - q) - gross
-    fees = m.fee_rate * (q + proceeds)
-    carry = q * m.carry_rate * m.hold_months / 12.0
-    profit = proceeds - q - fees - carry - m.donation
+    mkt = price_at(m, m.hold_months)
+    shares = m.capital / p0
+    gain = shares * (mkt - p0)
+    profit = gain - m.donation
+    spent = m.capital + m.donation
     return MarginalProfitOutcome(
-        entry_price=entry,
-        exit_price=exit_,
         market_price=mkt,
-        target_price=tgt,
+        target_price=target_price(m),
         true_prob=m.win_prob(m.donation),
         shares=shares,
-        gross_gain=gross,
-        slippage=slippage,
-        fees=fees,
-        carry=carry,
+        price_gain=gain,
         donation=m.donation,
         profit=profit,
-        roi=profit / (q + m.donation) if q + m.donation > 0 else 0.0,
+        roi=profit / spent if spent > 0 else 0.0,
+    )
+
+
+def return_per_dollar(m: MarginalProfitScenario) -> float:
+    """Gain per dollar spent on YES: ``(m - p0) / p0``. Profit is this times Q, minus D."""
+    p0 = m.base_win_prob
+    return (price_at(m, m.hold_months) - p0) / p0
+
+
+def break_even_capital(m: MarginalProfitScenario) -> float | None:
+    """Smallest position that earns back the donation, ``D / return per dollar``. None if the
+    price never rises (the donation can't be earned back at any size)."""
+    g = return_per_dollar(m)
+    return m.donation / g if g > 0 else None
+
+
+def break_even_months(m: MarginalProfitScenario) -> float | None:
+    """Hold time at which profit reaches zero, or None if the market never closes enough of the gap
+    (profit only approaches the eventual gain, which may still be below the donation)."""
+    p0 = m.base_win_prob
+    gap = target_price(m) - p0
+    if m.donation <= 0:
+        return 0.0
+    if m.capital <= 0 or gap <= 0:
+        return None
+    needed = m.donation * p0 / (m.capital * gap)  # share of the gap that must be closed
+    if needed >= 1:
+        return None
+    if m.half_life_months <= 0:
+        return 0.0
+    return m.half_life_months * math.log2(1.0 / (1.0 - needed))
+
+
+def first_dollar_return(m: MarginalProfitScenario) -> float:
+    """Expected gain from the first donated dollar, ``(Q / p0) * belief * catch-up * k / s``. The
+    slope of the effect curve at zero is k / s for every form. A donation only pays when this
+    exceeds $1 (compare ``V * k / s`` in the Full Hedge model)."""
+    return (m.capital / m.base_win_prob) * m.belief * catch_up(m.hold_months, m.half_life_months) * (
+        m.effect_size / m.effect_scale
     )

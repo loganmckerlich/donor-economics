@@ -7,51 +7,56 @@ export interface Preset {
   ui: Partial<UiState>;
 }
 
-const DEEP = { depth: 500e6, fee: 0.005 }; // a deep, cheap-to-trade market
-
 /** One-click scenarios. Anything not listed resets to the defaults. Profits quoted in the blurbs come from the Python model. */
 export const PRESETS: Preset[] = [
   {
     id: "literature",
     label: "Literature-sized effect",
     blurb:
-      "The default. A $10M donation moves the price about 1 point, but the position needs about 7 points to cover the donation, fees and carry. It loses roughly $12M, and no donation or trade size pays at these assumptions.",
+      "The default. A $10M donation moves the price about 1 point by month 3, but the position needs 5 points to earn the donation back, so it loses about $8M. Even if the market caught up fully it would not pay at this size.",
     ui: {},
   },
   {
-    id: "deep",
-    label: "Deep market, strong effect",
+    id: "huge",
+    label: "Literature effect, huge position",
     blurb:
-      "An 8-point boost from $50M in a deep, cheap market ($500M moves the price a point, 0.5% fees). A $60M donation with $1B of YES, sold after 4.5 months, earns about $31M, a 3% return on the money deployed. The edge is thin even here.",
-    ui: { ...DEEP, boost: 0.08, donation: 60e6, capital: 1e9, hold: 4.5 },
+      "The same weak effect, but $1B of YES instead of $100M. With no fees and no price impact in the model, profit scales with the size of the position, so the same 1-point move now earns about $8M. Real markets could not absorb this: that friction is outside the model.",
+    ui: { capital: 1e9 },
+  },
+  {
+    id: "strong",
+    label: "Strong effect",
+    blurb:
+      "An 8-point boost from $50M. A $40M donation with $500M of YES, sold after 3 months, earns about $23M. It breaks even after about 1.2 months.",
+    ui: { boost: 0.08, donation: 40e6, capital: 500e6 },
   },
   {
     id: "fast",
     label: "Fast market",
     blurb:
-      "Same effect, but the market catches up in days (half-life 0.25 months). Selling after 2 months captures nearly all of the move and earns about $31M.",
-    ui: { ...DEEP, boost: 0.08, donation: 40e6, capital: 800e6, hold: 2, halfLife: 0.25 },
+      "The same trade, but the market catches up in days (half-life 0.25 months). Selling after 2 months captures nearly all of the move and earns about $32M.",
+    ui: { boost: 0.08, donation: 40e6, capital: 500e6, hold: 2, halfLife: 0.25 },
   },
   {
     id: "slow",
     label: "Slow market",
     blurb:
-      "The same trade as the fast market, but the market takes months to react (half-life 4 months). After 2 months under a third of the move has happened, and the position loses about $47M. Holding longer helps (the best sell time is about 10 months) but carry piles up, and even then it loses about $15M.",
-    ui: { ...DEEP, boost: 0.08, donation: 40e6, capital: 800e6, hold: 2, halfLife: 4 },
+      "The same trade, but the market takes months to react (half-life 4 months). After 2 months only about 30% of the move has happened and the position loses about $19M. It would break even if held about 4.7 months, so waiting rescues it.",
+    ui: { boost: 0.08, donation: 40e6, capital: 500e6, hold: 2, halfLife: 4 },
   },
   {
     id: "skeptic",
     label: "Skeptical market",
     blurb:
-      "Traders only believe 40% of the donation's real effect, so the price settles well short of the true win chance. The position loses about $44M however long it is held.",
-    ui: { ...DEEP, boost: 0.08, belief: 0.4, donation: 40e6, capital: 800e6, hold: 3 },
+      "Traders only believe 40% of the donation's real effect, so the price settles well short of the true win chance. The position loses about $15M, and no amount of waiting fixes it: the price never rises far enough.",
+    ui: { boost: 0.08, belief: 0.4, donation: 40e6, capital: 500e6 },
   },
   {
     id: "overreact",
     label: "Over-reacting market",
     blurb:
-      "A modest 5-point effect, but traders over-react and price in twice the true boost. That is a gift to a buyer who is early: about $31M on a $30M donation and $800M of YES.",
-    ui: { ...DEEP, boost: 0.05, belief: 2, donation: 30e6, capital: 800e6, hold: 3 },
+      "A modest 5-point effect, but traders over-react and price in twice the true boost. That is a gift to a buyer who is early: about $38M on a $30M donation and $500M of YES.",
+    ui: { boost: 0.05, belief: 2, donation: 30e6, capital: 500e6 },
   },
 ];
 
@@ -60,4 +65,3 @@ export const isPreset = (ui: UiState, p: Preset): boolean => {
   const t = presetState(p);
   return (Object.keys(t) as (keyof UiState)[]).every((k) => ui[k] === t[k]);
 };
-
