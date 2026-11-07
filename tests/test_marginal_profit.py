@@ -61,3 +61,43 @@ def test_without_carry_waiting_never_hurts():
     m = MarginalProfitScenario(effect_size=0.05, carry_rate=0.0)
     profits = [evaluate(replace(m, hold_months=t)).profit for t in (0, 1, 3, 6, 12)]
     assert profits == sorted(profits)
+
+
+# --- Cost mechanics, pinned to hand-computed numbers --------------------------------------------
+# A position with no donation effect (k = 0) sits at p0 = 0.5, so every cost can be worked out by hand.
+FLAT = dict(effect_size=0.0, donation=0.0, base_win_prob=0.5)
+
+
+def test_entry_and_exit_price_impact_hand_computed():
+    # depth $100M per point, Q = $50M: buying moves the price 0.5 pts, so the average fill is 0.25 pts up.
+    m = MarginalProfitScenario(**FLAT, capital=50e6, depth_per_point=100e6, fee_rate=0.0, carry_rate=0.0)
+    o = evaluate(m)
+    assert o.entry_price == pytest.approx(0.5025)
+    # shares = 50e6 / 0.5025; selling them at 0.5 moves the price shares*0.5/(100e6*100) = 0.004975,
+    # so the average fill is half of that below the quote.
+    assert o.exit_price == pytest.approx(0.4975124, abs=1e-7)
+    assert o.profit == pytest.approx(o.shares * o.exit_price - 50e6)  # no fees, carry or donation
+    assert o.slippage == pytest.approx(o.profit)  # all of the loss is slippage
+
+
+def test_fees_are_paid_on_both_the_buy_and_the_sell():
+    # No move and no impact: shares are bought and sold at 0.5, so proceeds == Q and fees == 2% of Q.
+    m = MarginalProfitScenario(**FLAT, capital=100e6, depth_per_point=1e18, fee_rate=0.01, carry_rate=0.0)
+    o = evaluate(m)
+    assert o.fees == pytest.approx(2e6)
+    assert o.profit == pytest.approx(-2e6)
+
+
+def test_carry_is_annual_rate_times_months_over_twelve():
+    m = MarginalProfitScenario(**FLAT, capital=120e6, depth_per_point=1e18, fee_rate=0.0, carry_rate=0.05, hold_months=6.0)
+    o = evaluate(m)
+    assert o.carry == pytest.approx(3e6)  # 120M * 5% * 6/12
+    assert o.profit == pytest.approx(-3e6)
+
+
+def test_slippage_grows_with_the_square_of_the_order_size():
+    def slip(q):
+        return -evaluate(MarginalProfitScenario(**FLAT, capital=q, depth_per_point=1e9, fee_rate=0.0, carry_rate=0.0)).slippage
+
+    ratio = slip(200e6) / slip(100e6)
+    assert 3.8 < ratio < 4.2  # linear impact: doubling the order roughly quadruples the cost
