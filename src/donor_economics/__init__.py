@@ -1,3 +1,4 @@
+from .marginal import MarginalOutcome, MarginalScenario
 from .model import (
     Scenario,
     Outcome,
@@ -10,6 +11,8 @@ from .model import (
 )
 
 __all__ = [
+    "MarginalOutcome",
+    "MarginalScenario",
     "Scenario",
     "Outcome",
     "certainty_equivalent",

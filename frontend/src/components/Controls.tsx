@@ -121,21 +121,29 @@ const TIPS: Record<ParamId, React.ReactNode> = {
 interface Ctx {
   set: (patch: Partial<UiState>) => void;
   /** the parameter the user is hovering or focused on, to outline the charts it drives */
-  setActive: (id: ParamId | null) => void;
+  setActive: (id: string | null) => void;
   /** remember the current charts as the "before" line, called when an interaction starts */
   snapshot: () => void;
 }
 export const ControlCtx = createContext<Ctx>({ set: () => {}, setActive: () => {}, snapshot: () => {} });
 
-function Chips({ param }: { param: ParamId }) {
+/** Per-control tooltip and chart chips. The Full Hedge page uses the built-in tables; other pages pass their own. */
+export interface FieldMeta {
+  tip?: React.ReactNode;
+  affects?: Record<number, "curve" | "marker">;
+  titles?: Record<number, string>;
+}
+
+function Chips({ param, affects, titles = CHART_TITLES }: { param: string; affects?: FieldMeta["affects"]; titles?: Record<number, string> }) {
+  const map = affects ?? AFFECTS[param as ParamId];
   return (
     <span className="flex items-center gap-1">
-      {Object.entries(AFFECTS[param]).map(([n, kind]) => (
+      {Object.entries(map).map(([n, kind]) => (
         <Tip
           key={n} focusable align="right" width="w-56" className="inline-flex"
           content={
             <T title={`Chart ${n}`}>
-              {CHART_TITLES[Number(n)]}.{" "}
+              {titles[Number(n)]}.{" "}
               {kind === "curve" ? "This control reshapes the chart." : "This control only moves your scenario's marker on the chart."}
             </T>
           }
@@ -149,8 +157,8 @@ function Chips({ param }: { param: ParamId }) {
   );
 }
 
-function Field({ param, label, display, readout, children }: {
-  param: ParamId; label: string; display?: string; readout?: string; children: React.ReactNode;
+function Field({ param, label, display, readout, children, tip, affects, titles }: FieldMeta & {
+  param: string; label: string; display?: string; readout?: string; children: React.ReactNode;
 }) {
   const { setActive } = useContext(ControlCtx);
   return (
@@ -160,7 +168,7 @@ function Field({ param, label, display, readout, children }: {
       onFocus={() => setActive(param)}
       onBlur={() => setActive(null)}
     >
-      <Tip content={TIPS[param]} width="w-full min-w-64">
+      <Tip content={tip ?? TIPS[param as ParamId]} width="w-full min-w-64">
         <div className="flex items-baseline justify-between gap-2 text-sm">
           <span className="text-ink">{label}</span>
           {display !== undefined && <span className="font-mono tabular-nums text-ink-2">{display}</span>}
@@ -169,21 +177,21 @@ function Field({ param, label, display, readout, children }: {
       </Tip>
       <div className="mt-1 flex items-center justify-between gap-2">
         <span className="text-xs text-ink-3">{readout}</span>
-        <Chips param={param} />
+        <Chips param={param} affects={affects} titles={titles} />
       </div>
     </div>
   );
 }
 
-export function SliderField(props: {
-  param: ParamId; label: string; readout?: string; value: number; min: number; max: number; step: number;
+export function SliderField(props: FieldMeta & {
+  param: string; label: string; readout?: string; value: number; min: number; max: number; step: number;
   display: string; onChange: (v: number) => void;
 }) {
-  const { param, label, readout, value, min, max, step, display, onChange } = props;
+  const { param, label, readout, value, min, max, step, display, onChange, tip, affects, titles } = props;
   const { snapshot } = useContext(ControlCtx);
   const armed = useRef(true); // first key press of a keyboard interaction snapshots once
   return (
-    <Field param={param} label={label} display={display} readout={readout}>
+    <Field param={param} label={label} display={display} readout={readout} tip={tip} affects={affects} titles={titles}>
       <input
         type="range" min={min} max={max} step={step} value={value} aria-label={label}
         onPointerDown={() => snapshot()}
@@ -196,10 +204,10 @@ export function SliderField(props: {
   );
 }
 
-export function FormField({ value, onChange }: { value: EffectForm; onChange: (v: EffectForm) => void }) {
+export function FormField({ value, onChange, ...meta }: FieldMeta & { value: EffectForm; onChange: (v: EffectForm) => void }) {
   const { snapshot } = useContext(ControlCtx);
   return (
-    <Field param="effectForm" label="Functional form">
+    <Field param="effectForm" label="Functional form" {...meta}>
       <select
         value={value} aria-label="Functional form"
         onChange={(e) => { snapshot(); onChange(e.target.value as EffectForm); }}

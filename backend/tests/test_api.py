@@ -49,6 +49,33 @@ def test_heatmaps():
     assert all(v >= -1 for row in j["ce_gain"] for v in row)  # hedging never hurts CE
 
 
+def test_marginal_analysis_shape_and_consistency():
+    r = c.post("/api/marginal", json={})
+    assert r.status_code == 200
+    j = r.json()
+    o = j["outcome"]
+    assert abs(o["gross_gain"] + o["slippage"] - o["fees"] - o["carry"] - o["donation"] - o["profit"]) < 1
+    t = j["curves"]["time"]
+    assert len(t["months"]) == len(t["market_price"]) == len(t["profit"]) == 49
+    assert t["market_price"][0] == 0.5 and t["market_price"][-1] > t["market_price"][1]
+    assert len(j["sweeps"]["time"]["profit"]) == len(j["sweeps"]["time"]["profit"][0]) == 21
+    assert j["strategy"]["best_plan"]["profit"] >= 0  # doing nothing is always available
+
+
+def test_marginal_best_plan_beats_doing_nothing_when_it_pays():
+    big = {"effect_size": 0.045, "depth_per_point": 500e6, "fee_rate": 0.005}
+    j = c.post("/api/marginal", json=big).json()
+    plan = j["strategy"]["best_plan"]
+    assert plan["profit"] > 0 and plan["donation"] > 0 and plan["capital"] > 0
+    again = c.post("/api/marginal", json={**big, "donation": plan["donation"], "capital": plan["capital"], "hold_months": plan["hold_months"]}).json()
+    assert abs(again["outcome"]["profit"] - plan["profit"]) < 1
+
+
+def test_marginal_validation():
+    assert c.post("/api/marginal", json={"belief": 5}).status_code == 422
+    assert c.post("/api/marginal", json={"depth_per_point": 0}).status_code == 422
+
+
 def test_knowledge_list_and_get():
     docs = c.get("/api/knowledge").json()
     slugs = [d["slug"] for d in docs]

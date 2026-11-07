@@ -2,11 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AssumptionsPanel from "@/components/AssumptionsPanel";
+import { Mini, Section } from "@/components/Blocks";
 import ChartCard from "@/components/ChartCard";
 import {
-  AdvancedGroup, affectedCharts, ControlCtx, ControlPanel, DEFAULT_UI, FormField, SliderField,
+  AdvancedGroup, affectedCharts, ControlCtx, DEFAULT_UI, FormField, SliderField,
   type ParamId, type UiState,
 } from "@/components/Controls";
+import useDebounced from "@/components/useDebounced";
 import Heatmap from "@/components/Heatmap";
 import LineChart, { type Series } from "@/components/LineChart";
 import Tip, { T } from "@/components/Tip";
@@ -24,16 +26,6 @@ const m0 = (v: number) => `$${(v / 1e6).toFixed(0)}M`;
 /** round to 2 significant figures so a log slider lands on tidy dollar amounts */
 const roundSig = (x: number) => { const mag = 10 ** (Math.floor(Math.log10(x)) - 1); return Math.round(x / mag) * mag; };
 
-/** debounce a value so sliders don't hammer the API */
-function useDebounced<T>(value: T, ms = 150): T {
-  const [v, setV] = useState(value);
-  useEffect(() => {
-    const t = setTimeout(() => setV(value), ms);
-    return () => clearTimeout(t);
-  }, [value, ms]);
-  return v;
-}
-
 const sig = (a: Analysis) => JSON.stringify([a.scenario, a.donation, a.hedge]);
 
 export default function Page() {
@@ -49,7 +41,10 @@ export default function Page() {
   useEffect(() => { dataRef.current = data; }, [data]);
 
   const set = useCallback((patch: Partial<UiState>) => setUi((u) => ({ ...u, ...patch })), []);
-  const ctx = useMemo(() => ({ set, setActive, snapshot: () => setGhost(dataRef.current) }), [set]);
+  const ctx = useMemo(
+    () => ({ set, setActive: (id: string | null) => setActive(id as ParamId | null), snapshot: () => setGhost(dataRef.current) }),
+    [set],
+  );
 
   const scenario = useMemo<ScenarioParams>(
     () => ({
@@ -97,7 +92,7 @@ export default function Page() {
       <SummaryBar d={data} onApply={applyOptimal} hasGhost={!!visibleGhost} onClearGhost={() => setGhost(null)} />
       <div className="mx-auto max-w-[1400px] space-y-8 px-4 py-6 sm:px-6">
         <header>
-          <h1 className="text-2xl font-semibold text-ink">Donor hedge explorer</h1>
+          <h1 className="text-2xl font-semibold text-ink">Full hedge strategy</h1>
           <p className="mt-1 max-w-3xl text-sm text-ink-2">
             A donor collects <em>V</em> if their candidate wins. They donate <em>D</em> to raise the odds, then buy NO on a
             prediction market to cover a loss. The market is efficient and already prices in the donation, orders fill at the
@@ -146,20 +141,6 @@ function PresetBar({ ui, onPick }: { ui: UiState; onPick: (i: number) => void })
         );
       })}
     </div>
-  );
-}
-
-function Mini({
-  label, value, sub, tip, align = "left",
-}: { label: string; value: string; sub?: string; tip: React.ReactNode; align?: "left" | "right" }) {
-  return (
-    <Tip content={tip} side="bottom" align={align} width="w-80" focusable className="min-w-0 cursor-help">
-      <div className="text-[11px] font-medium uppercase tracking-wide text-ink-3 sm:truncate underline decoration-dotted decoration-ink-3/50 underline-offset-4">
-        {label}
-      </div>
-      <div className="truncate text-lg font-semibold tabular-nums text-ink">{value}</div>
-      {sub && <div className="text-xs leading-snug text-ink-3">{sub}</div>}
-    </Tip>
   );
 }
 
@@ -249,29 +230,6 @@ function SummaryBar({
         </div>
       </div>
     </div>
-  );
-}
-
-function Section({
-  letter, title, question, controls, children,
-}: { letter: string; title: string; question: string; controls?: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <section aria-labelledby={`sec-${letter}`}>
-      <div className="mb-3">
-        <h2 id={`sec-${letter}`} className="text-lg font-semibold text-ink">
-          <span className="mr-2 text-ink-3">{letter}</span>{title}
-        </h2>
-        <p className="text-sm text-ink-2">{question}</p>
-      </div>
-      {controls ? (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
-          <ControlPanel>{controls}</ControlPanel>
-          <div className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-2">{children}</div>
-        </div>
-      ) : (
-        <div className="grid min-w-0 grid-cols-1 gap-4 xl:grid-cols-2">{children}</div>
-      )}
-    </section>
   );
 }
 

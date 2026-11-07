@@ -5,8 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from donor_economics import Scenario
 
-from . import analysis, knowledge
-from .schemas import AnalysisIn, DonationHeatmapIn, HedgeValueIn
+from . import analysis, knowledge, marginal
+from .schemas import AnalysisIn, DonationHeatmapIn, HedgeValueIn, MarginalIn
 
 app = FastAPI(title="Donor Economics API", version="0.1.0")
 app.add_middleware(
@@ -44,6 +44,11 @@ def post_hedge_value(body: HedgeValueIn) -> dict:
     return analysis.hedge_value_heatmap(
         body.scenario.to_model(), body.risk_aversion_range, body.donation_range, body.n
     )
+
+
+@app.post("/api/marginal")
+def post_marginal(body: MarginalIn) -> dict:
+    return marginal.marginal_analysis(body.to_model())
 
 
 @app.get("/api/knowledge")

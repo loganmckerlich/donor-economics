@@ -2,7 +2,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-from donor_economics import Scenario
+from donor_economics import MarginalScenario, Scenario
 
 
 class ScenarioIn(BaseModel):
@@ -15,6 +15,28 @@ class ScenarioIn(BaseModel):
 
     def to_model(self) -> Scenario:
         return Scenario(**self.model_dump())
+
+
+class MarginalIn(BaseModel):
+    """Marginal-profit strategy. Win-probability curve fields match ``ScenarioIn``."""
+
+    base_win_prob: float = Field(0.50, gt=0, lt=0.99)
+    effect_size: float = Field(0.015, ge=0, le=1)
+    effect_scale: float = Field(10e6, gt=0, le=1e11)
+    effect_form: Literal["log", "linear", "saturating"] = "log"
+    donation: float = Field(10e6, ge=0, le=1e10)
+    capital: float = Field(100e6, ge=0, le=1e10)  # $ spent buying YES
+    hold_months: float = Field(3.0, ge=0, le=60)
+    half_life_months: float = Field(1.0, ge=0, le=60)  # 0 = the market reprices instantly
+    belief: float = Field(1.0, ge=0, le=3)  # share of the true boost the market ends up pricing
+    depth_per_point: float = Field(200e6, gt=0, le=1e12)  # $ of orders that move the price 1 point
+    fee_rate: float = Field(0.01, ge=0, le=0.2)  # per side
+    carry_rate: float = Field(0.05, ge=0, le=1)  # annual
+
+    def to_model(self) -> MarginalScenario:
+        d = self.model_dump()
+        base = Scenario(**{k: d.pop(k) for k in ("base_win_prob", "effect_size", "effect_scale", "effect_form")})
+        return MarginalScenario(base=base, **d)
 
 
 class AnalysisIn(BaseModel):
