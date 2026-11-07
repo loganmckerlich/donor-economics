@@ -44,6 +44,7 @@
 | Basis risk | Hedge instrument imperfectly matching exposure (e.g. a market resolving on a different event than the policy payoff) |
 | Full Hedge Strategy | The app's first page: donate to raise the win probability, then buy NO to hedge. Profit is judged at the election result, so the question is how much risk the hedge removes |
 | Marginal Profit Strategy | The app's second page: buy YES, donate, and sell once the market has priced in the boost. There is no bet on the election itself; the profit is the price move on the YES contracts, and the donation is a sunk cost it has to earn back |
+| Market manipulation | Trading, or acting, with intent to move a market price. The CFTC's anti-manipulation rules (CEA 6(c)(1), Rule 180.1) cover this. The Marginal Profit Strategy resembles it because its profit comes only from a price move the donor causes; whether a donation counts is untested |
 | Market lag | The assumption the Marginal Profit Strategy rests on: the market prices in the donation slowly, after the donor has already bought. If traders anticipate the donation, the entry price already includes it and the profit disappears |
 | Money spent on YES (trade size) | Dollars used to buy YES contracts before the donation, `Q`. Shares bought are `Q / entry price`. Profit grows with `Q` until price impact takes over |
 | Hold time | Months between buying YES and selling it. The app's time axis runs from 0 to 12 months; the contract is assumed to stay open throughout, so there is no election result to worry about |

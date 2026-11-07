@@ -96,10 +96,16 @@ export default function MarginalProfitPage() {
             the donation is a cost it has to earn back. There is no bet on the election itself, and time matters: the market
             catches up gradually, and holding costs money. Each section has its own sliders beside the charts they drive.
           </p>
+          <div role="note" className="mt-3 max-w-3xl rounded-lg border border-series-2 bg-surface px-4 py-3 text-sm text-ink-2">
+            <strong className="font-semibold text-ink">Legal caution.</strong> Buying YES, then making a donation expected to raise
+            the YES price, then selling is close to profiting from a price move you cause and know about in advance. Regulators may
+            treat that as market manipulation or trading on non-public information, and this model has no legal cost. It is a
+            theory exercise, not a recommendation or legal advice.
+          </div>
           <div className="mt-3 max-w-3xl rounded-lg border border-grid bg-surface px-4 py-3 text-sm text-ink-2">
             <div className="text-[11px] font-medium uppercase tracking-wide text-ink-3">The results rest on these assumptions</div>
             <ul className="mt-1.5 list-disc space-y-1 pl-5">
-              <li>The donor buys <strong className="font-semibold text-ink">before anyone reacts</strong>: nobody else trades on the donation, or anticipates it.</li>
+              <li>The donor buys <strong className="font-semibold text-ink">before anyone reacts</strong>: nobody else trades on the donation, or anticipates it. The donor knows first because the donor is the cause.</li>
               <li>The price moves <strong className="font-semibold text-ink">only because of the donation</strong>, closing half the gap every half-life. No other news or noise.</li>
               <li>Price impact is linear; fees and the cost of tied-up cash are flat rates. One buy and one sell, with the contract open throughout.</li>
               <li>Depth, fees, carry and half-life defaults are <strong className="font-semibold text-ink">illustrative, not measured</strong> from real markets.</li>

@@ -28,7 +28,7 @@ Spend `H`, depth `L`: avg price `c0 + H/(2L)`; final marginal price `c0 + H/L`. 
 - Mitigation: slice orders (TWAP), use multiple venues, resting limit orders (maker, lower fee), but anonymity via multiple accounts can breach KYC/terms (see file 05).
 
 ## Manipulation concerns
-- Large trades could be used to move the market price to influence perceived momentum ("bandwagon" fears). The literature (Hanson & Oprea 2009, "A Manipulator Can Aid Prediction Market Accuracy") argues manipulators can *improve* accuracy by subsidising informed traders; but regulators view it differently. A donor who funds a candidate and also trades the market has an apparent manipulation incentive. [Contested]
+- Large trades could be used to move the market price to influence perceived momentum ("bandwagon" fears). The literature (Hanson & Oprea 2009, "A Manipulator Can Aid Prediction Market Accuracy") argues manipulators can *improve* accuracy by subsidising informed traders; but regulators view it differently. A donor who funds a candidate and also trades the market has an apparent manipulation incentive. [Contested] The Marginal Profit Strategy is that incentive in its purest form (buy YES, donate, sell), so see file 05 before reading its profits as achievable.
 - 2024: some argued Polymarket whales skewed odds toward Trump ([DL News](https://dlnews.com/articles/defi/4-crypto-whales-are-skewing-trump-polymarket-election-bet/)); results of whether this affected votes are [Unverified/likely small].
 
 ## Implications for this project

@@ -22,7 +22,7 @@ export const ASSUMPTIONS_CONTENT: AssumptionsContent = {
       statement:
         "YES is bought at the pre-donation price. Nobody else trades on the donation, and nobody anticipates it, before the donor's order fills.",
       example:
-        "The donor pays about 50.25¢ per share. If traders had already seen the donation coming, the price would start higher and most of the profit would be gone.",
+        "The donor pays about 50.25¢ per share. If traders had already seen the donation coming, the price would start higher and most of the profit would be gone. The donor can only be first because they control the donation, which is the pattern that market-manipulation rules look for.",
     },
     {
       title: "The market ends up pricing a share of the true effect",
@@ -81,10 +81,11 @@ export const ASSUMPTIONS_CONTENT: AssumptionsContent = {
         "A donation announced weeks in advance would already be in the price, leaving nothing to profit from.",
     },
     {
-      title: "Legal and regulatory risk",
+      title: "Legal and regulatory risk, possibly disqualifying",
       statement:
-        "Donating while holding a position that gains from it raises campaign-finance and market-manipulation questions that could cost far more than the trade makes.",
-      example: "A regulator that treated the donation as manipulation could void the trade or add penalties. The model has none.",
+        "Building a position and then taking an action you control that is expected to move its price is the textbook pattern behind market-manipulation and non-public-information rules. The profit here comes only from that move. The model has no legal cost and no chance of being stopped.",
+      example:
+        "The default shows a −$12.4M loss, but the Deep market preset shows about +$31M. In real life that profit would be exposed to enforcement, voided trades, venue bans and a press story of a donor who bought YES and then funded the candidate. Whether a donation counts as manipulation is untested, so none of this is advice.",
     },
     {
       title: "Position and liquidity limits",
@@ -99,6 +100,11 @@ export const ASSUMPTIONS_CONTENT: AssumptionsContent = {
     },
   ],
   depends: [
+    {
+      result: "Any profit shown is conditional on the strategy being legal",
+      rests: "Nothing in the model: it has no legal cost, no venue rules and no enforcement risk.",
+      breaks: "If the donor-then-trade pattern counts as manipulation or use of non-public information, the profit is a liability, not an income.",
+    },
     {
       result: "The whole strategy needs the market to lag",
       rests: "Assumptions 2 and 3: the price moves after the donor has bought, and slowly.",
