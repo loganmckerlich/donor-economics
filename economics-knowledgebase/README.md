@@ -8,7 +8,7 @@ Can a billionaire donor who gains `V` if candidate A wins, and donates `D` to A,
 ## The two models in brief
 **Full Hedge model.** Static, one binary contract. The donor receives `V` iff A wins; the donation `D` is a sunk cost. Win probability is `p(D) = min(p0 + k*ln(1 + D/s), 0.999)` by default. The market is efficient and reprices for the donation, so the YES price is `m = p(D)`, and the hedge buys NO at `1 - m`. Payoffs: win `V - D - H`; lose `-D + H*m/(1 - m)`. The donor has CARA utility (`a = 0` is risk-neutral).
 
-**Marginal Profit model.** The donor does not hold to the election or hedge. They buy `Q` dollars of YES at the pre-donation price `p0`, donate `D`, and sell after `hold` months. The market moves toward an eventual price `p0 + belief * (p(D) - p0)`, closing half the remaining gap every half-life. Like the Full Hedge model it is frictionless: orders fill at the quoted price, with no fees, spread, price impact or cost of cash. Profit is `(Q / p0) * (price at exit - p0) - D`, compared with doing nothing, and the risk is ignored. The two models share the donation effect curve `p(D)`.
+**Marginal Profit model.** The donor buys `Q` dollars of YES at the pre-donation price `p0`, donates `D`, and sells the YES after the price has gone up, before the election. The price captures a share `capture` of the true boost, so it ends at `p0 + capture * (p(D) - p0)`; one number stands in for both how much the market believes the donation and how long the donor waits. Like the Full Hedge model it is frictionless: orders fill at the quoted price, with no fees, spread, price impact or cost of cash. The trade profit `(Q / p0) * (price after - p0)` is the same whether or not the candidate wins, so the payoffs are: wins `V - D + trade profit`, loses `-D + trade profit`. The expected gain compared with doing nothing is `trade profit - D + V * (p(D) - p0)`. The two models share the donation effect curve `p(D)`.
 
 ## How the model maps to the topics
 
@@ -21,8 +21,8 @@ Can a billionaire donor who gains `V` if candidate A wins, and donates `D` to A,
 | `donation` (D) decision | Sunk cost; judged by `donation_ev` | [04 donations](04-political-donations.md) |
 | `hedge` (H) decision | Dollars on NO at `1 - m`; full hedge `H* = V*(1 - m)` | [01 hedging](01-hedging-and-risk.md) |
 | Market price `m = p(D)` | Efficient market reprices for the donation (Full Hedge model) | [02 mechanics](02-prediction-market-mechanics.md), [06 quant](06-quantitative-methods.md) |
-| `belief`, `half_life_months` (Marginal Profit) | Share of the true boost the market ends up pricing, and how slowly it gets there | [02 mechanics](02-prediction-market-mechanics.md), [03 microstructure](03-microstructure-and-price-impact.md) |
-| `capital` (Q), `hold_months` (Marginal Profit) | Dollars spent on YES and months held before selling | [03 microstructure](03-microstructure-and-price-impact.md) (what is left out) |
+| `capture` (Marginal Profit) | Share of the true boost the price captures by the time the YES is sold | [02 mechanics](02-prediction-market-mechanics.md), [03 microstructure](03-microstructure-and-price-impact.md) |
+| `capital` (Q), `payoff_if_win` (V) (Marginal Profit) | Dollars spent on YES, and the payoff if the candidate wins (0 = pure trade) | [03 microstructure](03-microstructure-and-price-impact.md) (what is left out), [04 donations](04-political-donations.md) |
 
 **In the model:** hedging and risk aversion (01), the binary contract and efficient repricing (02), the donation effect (04), and expected utility (06). **Extensions (outside both models):** fees and depth (02), price impact, signaling and manipulation (03), position limits, legal, tax and platform risk (05), anticipation of the donation by other traders, and the calibration and Monte Carlo ideas (06). Notes 02, 03 and 05 are kept as background, and each has an "Implications" section mapping them onto the models.
 

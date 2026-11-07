@@ -13,15 +13,15 @@ import Tip, { T } from "@/components/Tip";
 import useDebounced from "@/components/useDebounced";
 import { boostToK } from "@/lib/effect";
 import { money, moneyShort, pct } from "@/lib/format";
-import { fetchMarginal, type MarginalAnalysis, type MarginalOutcome, type MarginalParams } from "./api";
+import { fetchMarginal, type MarginalAnalysis, type MarginalParams } from "./api";
 import { ASSUMPTIONS_CONTENT } from "./assumptions";
 import { MFormField, MSlider } from "./fields";
+import { PayoffTable, ProbabilitySteps, ResponseTable } from "./parts";
 import { isPreset, presetState, PRESETS } from "./presets";
 import { affectedCharts, DEFAULT_UI, type ParamId, type UiState } from "./scenario";
 
 const CAT = ["var(--series-1)", "var(--series-2)", "var(--series-3)"];
 const m0 = (v: number) => `$${(v / 1e6).toFixed(0)}M`;
-const months = (v: number) => `${+v.toFixed(1)} mo`;
 const pts = (v: number) => `${v >= 0 ? "+" : "−"}${Math.abs(v * 100).toFixed(1)} pts`;
 const sig = (a: MarginalAnalysis) => JSON.stringify([a.outcome, a.strategy.optimal_donation]);
 
@@ -46,15 +46,14 @@ export default function MarginalProfitPage() {
 
   const params = useMemo<MarginalParams>(
     () => ({
+      payoff_if_win: ui.payoff,
       base_win_prob: ui.baseProb,
       effect_size: boostToK(ui.boost, ui.effectForm, ui.effectScale),
       effect_scale: ui.effectScale,
       effect_form: ui.effectForm,
       donation: ui.donation,
       capital: ui.capital,
-      hold_months: ui.hold,
-      half_life_months: ui.halfLife,
-      belief: ui.belief,
+      capture: ui.capture,
     }),
     [ui],
   );
@@ -86,10 +85,18 @@ export default function MarginalProfitPage() {
         <header>
           <h1 className="text-2xl font-semibold text-ink">Marginal profit strategy</h1>
           <p className="mt-1 max-w-3xl text-sm text-ink-2">
-            Instead of hedging, the donor <em>trades</em> the donation. They buy YES contracts, donate to raise the candidate&apos;s
-            odds, and sell after a few months once the market has noticed. The profit is the price move on the YES contracts;
-            the donation is a cost it has to earn back. There is no bet on the election itself. Time matters because the
-            market catches up gradually. The market is otherwise frictionless: orders fill at the quoted price, with no fees.
+            Instead of hedging, the donor <em>trades</em> the donation. The idea in five steps:
+          </p>
+          <ol className="mt-2 max-w-3xl list-decimal space-y-0.5 pl-5 text-sm text-ink-2">
+            <li><strong className="font-semibold text-ink">Buy YES</strong> at today&apos;s price.</li>
+            <li><strong className="font-semibold text-ink">Donate</strong>, which raises the candidate&apos;s win probability.</li>
+            <li>The <strong className="font-semibold text-ink">probability goes up</strong>, and the YES price follows.</li>
+            <li><strong className="font-semibold text-ink">Sell the YES at a profit</strong>, before the election.</li>
+            <li>Optionally, <strong className="font-semibold text-ink">also win the payoff</strong> if the candidate wins.</li>
+          </ol>
+          <p className="mt-2 max-w-3xl text-sm text-ink-2">
+            The profit in step 4 is the same whether or not the candidate wins, because the YES is sold first. What it does not
+            remove is the election risk on the payoff, and it adds a new one: how far the market actually follows the donation.
             Each section has its own sliders beside the charts they drive.
           </p>
           <div role="note" className="mt-3 max-w-3xl rounded-lg border border-series-2 bg-surface px-4 py-3 text-sm text-ink-2">
@@ -102,9 +109,9 @@ export default function MarginalProfitPage() {
             <div className="text-[11px] font-medium uppercase tracking-wide text-ink-3">The results rest on these assumptions</div>
             <ul className="mt-1.5 list-disc space-y-1 pl-5">
               <li>The donor buys <strong className="font-semibold text-ink">before anyone reacts</strong>: nobody else trades on the donation, or anticipates it. The donor knows first because the donor is the cause.</li>
-              <li>The price moves <strong className="font-semibold text-ink">only because of the donation</strong>, closing half the gap every half-life. No other news or noise.</li>
-              <li><strong className="font-semibold text-ink">No frictions</strong>: any order fills at the quoted price, with no fees, price impact or cost of cash. So profit grows in a straight line with position size, and there is no cost to waiting. One buy and one sell.</li>
-              <li>The half-life and market-belief defaults are <strong className="font-semibold text-ink">illustrative, not measured</strong> from real markets.</li>
+              <li>The price captures a <strong className="font-semibold text-ink">set share of the boost</strong> by the time you sell, and nothing else moves it. That share is illustrative, not measured from real markets.</li>
+              <li><strong className="font-semibold text-ink">No frictions</strong>: any order fills at the quoted price, with no fees, price impact or cost of cash. So the trade profit grows in a straight line with position size.</li>
+              <li>One buy and one sell, <strong className="font-semibold text-ink">before the election</strong>, so the trade profit is the same if the candidate wins or loses.</li>
             </ul>
             <p className="mt-2 text-xs text-ink-3">The full list, with examples and what is left out, is in Model assumptions below.</p>
           </div>
@@ -126,52 +133,41 @@ function SummaryBar({
 }: { d: MarginalAnalysis | null; donation: number; onApply: () => void; hasGhost: boolean; onClearGhost: () => void }) {
   const o = d?.outcome;
   const st = d?.strategy;
-  const be = st?.break_even_months;
   const canApply = !!st && Math.abs(st.optimal_donation - donation) > 0.5e6;
   return (
     <div className="z-20 border-b border-grid bg-surface/95 sm:sticky sm:top-0 sm:backdrop-blur">
       <div className="mx-auto grid max-w-[1400px] grid-cols-2 items-start gap-x-6 gap-y-3 px-4 py-2.5 sm:px-6 lg:grid-cols-[repeat(4,minmax(0,1fr))_auto]">
         <Mini
-          label="Net profit"
-          value={o ? money(o.profit) : "…"}
-          sub={o ? `${(o.roi * 100).toFixed(1)}% on ${moneyShort(o.donation + (d?.scenario.capital ?? 0))} deployed` : undefined}
+          label="Trade profit"
+          value={o ? money(o.trade_profit) : "…"}
+          sub="Earned whether or not the candidate wins"
           tip={
-            <T title="Net profit">
-              What the plan earns compared with doing nothing: the price gain on the YES contracts minus the donation.
-              Negative means the price move does not earn back what the donation cost. It equals
-              shares × (sale price − purchase price) − D.
+            <T title="Trade profit">
+              What the YES contracts earn: the number of contracts times the rise in their price, before the donation. Because
+              you sell before the election, it is the same whether the candidate wins or loses.
             </T>
           }
         />
         <Mini
-          label="Price move"
+          label="If the candidate loses"
           align="right"
-          value={st ? pts(st.price_move) : "…"}
-          sub={st ? (st.needed_move === null ? "Nothing spent on YES" : `Needs ${pts(st.needed_move)} to break even`) : undefined}
+          value={o ? money(o.payoff_lose) : "…"}
+          sub={o ? `Trade profit minus the ${money(o.donation)} donation` : undefined}
           tip={
-            <T title="Price move">
-              How far the YES price has risen by the time you sell, against the rise needed to earn back the donation
-              (the donation divided by the number of contracts you hold). Profit needs the first number to beat the second.
+            <T title="If the candidate loses">
+              The donor&apos;s result if the candidate loses: the trade profit minus the donation. Without the trade it would be
+              the donation lost. Positive means the donor comes out ahead even though the candidate lost.
             </T>
           }
         />
         <Mini
-          label="Time to break even"
-          value={st ? (be === null || be === undefined ? "Never" : months(be)) : "…"}
-          sub={
-            st
-              ? be === null || be === undefined
-                ? "The market never closes enough of the gap"
-                : be === 0
-                  ? "Nothing to earn back"
-                  : "Hold at least this long to earn back the donation"
-              : undefined
-          }
+          label="If the candidate wins"
+          value={o ? money(o.payoff_win) : "…"}
+          sub={o && d ? `${money(d.scenario.payoff_if_win)} payoff plus the trade, minus the donation` : undefined}
           tip={
-            <T title="Time to break even">
-              The hold time at which profit reaches $0. Waiting costs nothing here, so selling later only helps, but the
-              market only closes part of the gap with time. &ldquo;Never&rdquo; means that even if the market closed the whole
-              gap, the gain would still be smaller than the donation.
+            <T title="If the candidate wins">
+              The donor&apos;s result if the candidate wins: the win payoff, plus the trade profit, minus the donation. The gap
+              between this and the losing case is always the win payoff, so the trade does not remove the election risk.
             </T>
           }
         />
@@ -182,22 +178,22 @@ function SummaryBar({
           sub={
             st
               ? st.optimal_donation > 0
-                ? `Adds ${money(st.optimal_donation_profit)} at your trade size and sell time`
-                : "No donation size pays at your trade size and sell time"
+                ? `Adds ${money(st.optimal_donation_ev)} of expected gain`
+                : "No donation size pays at these settings"
               : undefined
           }
           tip={
             <T title="Best donation">
-              The donation that earns the most, with the trade size and sell time where you have set them. $0 means that
-              every donated dollar returns less than a dollar through the price move, so the best move is to give nothing.
-              A bigger position or a faster market raises it.
+              The donation with the highest expected gain, counting both the trade and the higher chance of winning, with the
+              other sliders where you have set them. $0 means every donated dollar returns less than a dollar, so the best move
+              is to give nothing.
             </T>
           }
         />
         <div className="col-span-2 flex items-center gap-3 lg:col-span-1">
           <Tip
             align="right" width="w-72" side="bottom"
-            content={<T title="Apply best donation">Sets the donation to the best amount for your trade size and sell time. Your previous charts stay behind as dotted lines.</T>}
+            content={<T title="Apply best donation">Sets the donation to the best amount for your other settings. Your previous charts stay behind as dotted lines.</T>}
           >
             <button onClick={onApply} disabled={!canApply}
               className="rounded-lg bg-series-1 px-3 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50">
@@ -215,114 +211,69 @@ function SummaryBar({
   );
 }
 
-/** Where the money goes: each item is signed, so the bars and the +/− text never rely on colour alone. */
-function Breakdown({ o }: { o: MarginalOutcome }) {
-  const rows = [
-    { label: "Price gain on YES", v: o.price_gain },
-    { label: "Donation", v: -o.donation },
-  ];
-  const total = { label: "Net profit", v: o.profit };
-  const max = Math.max(...rows.map((r) => Math.abs(r.v)), Math.abs(total.v), 1);
-  const row = (r: { label: string; v: number }, strong = false) => (
-    <li key={r.label} className={`grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)_5rem] items-center gap-3 text-sm sm:grid-cols-[11rem_minmax(0,1fr)_5.5rem] ${strong ? "border-t border-grid pt-2 font-semibold text-ink" : "text-ink-2"}`}>
-      <span className="truncate">{r.label}</span>
-      <span className="relative h-3 rounded bg-grid/60" aria-hidden>
-        <span className="absolute inset-y-0 left-1/2 w-px bg-axis" />
-        <span
-          className="absolute inset-y-0 rounded"
-          style={{
-            background: r.v >= 0 ? "var(--series-3)" : "var(--series-2)",
-            width: `${(Math.abs(r.v) / max) * 50}%`,
-            [r.v >= 0 ? "left" : "right"]: "50%",
-          }}
-        />
-      </span>
-      <span className="text-right font-mono tabular-nums text-ink">{money(r.v)}</span>
-    </li>
-  );
-  return (
-    <div className="rounded-xl border border-grid bg-surface p-4">
-      <h3 className="text-base font-semibold text-ink">Where the money goes</h3>
-      <p className="mb-3 mt-1 text-sm text-ink-2">
-        The price gain has to earn back the donation. Bars to the right earn money; bars to the left cost it.
-      </p>
-      <ul className="space-y-2">
-        {rows.map((r) => row(r))}
-        {row(total, true)}
-      </ul>
-    </div>
-  );
-}
+const standing = (v: number) => (v >= 0 ? <strong>{money(v)} ahead</strong> : <strong>{money(-v)} behind</strong>);
 
 function Sections({
   d, ghost, ui, active, set,
 }: { d: MarginalAnalysis; ghost: MarginalAnalysis | null; ui: UiState; active: ParamId | null; set: (p: Partial<UiState>) => void }) {
   const o = d.outcome;
   const st = d.strategy;
-  const tc = d.curves.time;
-  const dc = d.curves.donation;
   const cc = d.curves.capital;
+  const dc = d.curves.donation;
+  const pc = d.curves.capture;
   const ringed = (n: number) => active !== null && affectedCharts(active).includes(n);
-  const caught = ui.halfLife <= 0 ? 1 : 1 - 0.5 ** (ui.hold / ui.halfLife);
   const dflt = DEFAULT_UI;
   const advancedA = ui.baseProb !== dflt.baseProb || ui.effectForm !== dflt.effectForm || ui.effectScale !== dflt.effectScale;
-  const be = st.break_even_months;
   const beQ = st.break_even_capital;
+  const beC = st.break_even_capture;
+  const expectedAbs = (win: number[], lose: number[]) => win.map((w, i) => o.true_prob * w + (1 - o.true_prob) * lose[i]);
 
   const verdict = (
     <>
-      {o.profit > 0 ? (
-        <>
-          <strong>This plan earns {money(o.profit)}</strong> ({(o.roi * 100).toFixed(1)}% on the money deployed). By month{" "}
-          {+ui.hold.toFixed(1)} the market has closed {pct(caught, 0)} of the gap, lifting the price {pts(st.price_move)}.
-        </>
-      ) : (
-        <>
-          <strong>This plan loses {money(-o.profit)}.</strong> By month {+ui.hold.toFixed(1)} the market has closed {pct(caught, 0)} of
-          the gap and the price is up {pts(st.price_move)}
-          {st.needed_move === null ? "." : <>, but the position needs {pts(st.needed_move)} to earn back the donation.</>}
-        </>
-      )}{" "}
+      If the candidate loses, the donor is {standing(o.payoff_lose)}: the trade earns <strong>{money(o.trade_profit)}</strong> and the
+      donation costs {money(o.donation)}. If the candidate wins, the donor is {standing(o.payoff_win)}. The trade adds the same{" "}
+      {money(o.trade_profit)} to both outcomes.{" "}
       {beQ !== null ? (
         <>
-          Each dollar in YES earns {pct(st.return_per_dollar)}, so the donation is earned back at{" "}
+          Each dollar in YES earns {pct(st.return_per_dollar)}, so the trade alone covers the donation at{" "}
           <strong>{moneyShort(beQ)}</strong> of YES (you have {moneyShort(ui.capital)}).
         </>
       ) : (
-        <>The price has not risen, so no position size would earn back the donation.</>
+        <>The price has not risen, so the trade earns nothing at any size and the worst case is the donation itself.</>
       )}{" "}
       {st.optimal_donation === 0 ? (
         <>
-          <strong>Don&apos;t donate at this size.</strong> The first donated dollar returns only{" "}
+          <strong>Don&apos;t donate at these settings.</strong> The first donated dollar returns only{" "}
           <strong>${st.first_dollar_return.toFixed(2)}</strong>, and returns fall from there.
         </>
       ) : (
         <>
-          <strong>The best donation is {moneyShort(st.optimal_donation)}</strong>, adding {money(st.optimal_donation_profit)} (the first
-          dollar returns ${st.first_dollar_return.toFixed(2)}).
+          <strong>The best donation is {moneyShort(st.optimal_donation)}</strong>, adding {money(st.optimal_donation_ev)} of expected
+          gain (the first dollar returns ${st.first_dollar_return.toFixed(2)}).
         </>
       )}{" "}
-      There are no fees or price impact in this model, so profit grows without limit as the position grows.
+      Expected gain from your plan: <strong>{money(o.ev)}</strong> ({money(o.profit)} from the trade net of the donation, plus{" "}
+      {money(o.win_value)} from the higher win chance). There are no fees or price impact in this model, so the trade grows
+      without limit as the position grows.
     </>
   );
 
   const g = ghost;
-  const ghostPrice: Series[] = g ? [{ key: "g-price", label: "before", color: "", ghost: true, x: g.curves.time.months, y: g.curves.time.market_price }] : [];
-  const ghostHold: Series[] = g ? [{ key: "g-hold", label: "before", color: "", ghost: true, x: g.curves.time.months, y: g.curves.time.profit }] : [];
-  const ghostDon: Series[] = g ? [{ key: "g-don", label: "before", color: "", ghost: true, x: g.curves.donation.donation, y: g.curves.donation.profit }] : [];
-  const ghostCap: Series[] = g ? [{ key: "g-cap", label: "before", color: "", ghost: true, x: g.curves.capital.capital, y: g.curves.capital.profit }] : [];
+  const ghostCap: Series[] = g ? [{ key: "g-cap", label: "before", color: "", ghost: true, x: g.curves.capital.capital, y: g.curves.capital.payoff_lose }] : [];
+  const ghostDon: Series[] = g ? [{ key: "g-don", label: "before", color: "", ghost: true, x: g.curves.donation.donation, y: g.curves.donation.ev }] : [];
+  const ghostCapture: Series[] = g ? [{ key: "g-cpt", label: "before", color: "", ghost: true, x: g.curves.capture.capture, y: g.curves.capture.ev }] : [];
 
-  const holdLines = [
-    { x: ui.hold, label: "Your sale" },
-    ...(be !== null && be > 0 && Math.abs(be - ui.hold) > 0.3 ? [{ x: be, label: "Break even" }] : []),
+  const capitalLines = [
+    { x: ui.capital, label: "Your trade" },
+    ...(beQ !== null && beQ > 0 && Math.abs(beQ - ui.capital) > 20e6 ? [{ x: beQ, label: "Loses break even" }] : []),
   ];
   const donationLines = [
     { x: ui.donation, label: "Your donation" },
     ...(st.optimal_donation > 0 && Math.abs(st.optimal_donation - ui.donation) > 2e6 ? [{ x: st.optimal_donation, label: "Best" }] : []),
   ];
-  const capitalLines = [
-    { x: ui.capital, label: "Your trade" },
-    ...(beQ !== null && beQ > 0 && Math.abs(beQ - ui.capital) > 20e6 ? [{ x: beQ, label: "Break even" }] : []),
+  const captureLines = [
+    { x: ui.capture, label: "Your setting" },
+    ...(beC !== null && beC > 0 && Math.abs(beC - ui.capture) > 0.05 ? [{ x: beC, label: "Break even" }] : []),
   ];
 
   const donationSlider = (
@@ -334,30 +285,28 @@ function Sections({
       display={moneyShort(ui.capital)} readout={`≈ ${(o.shares / 1e6).toFixed(0)}M contracts`}
       onChange={(v) => set({ capital: v })} />
   );
-  const holdSlider = (
-    <MSlider param="hold" label="Hold time" value={ui.hold} min={0} max={12} step={0.25}
-      display={months(ui.hold)} onChange={(v) => set({ hold: v })} />
+  const captureSlider = (
+    <MSlider param="capture" label="Share of the boost the price captures" value={ui.capture} min={0} max={2} step={0.05}
+      display={`${Math.round(ui.capture * 100)}%`} readout={`price ${pct(d.scenario.base_win_prob, 1)} → ${pct(o.price_after, 1)}`}
+      onChange={(v) => set({ capture: v })} />
   );
-  const noPay = "The lightest shade means the plan loses money; stronger shades earn more. If the whole grid is the lightest shade, nothing here pays: try a scenario preset.";
+  const noPay = "The lightest shade means the plan loses money in expectation; stronger shades earn more. If the whole grid is the lightest shade, nothing here pays: try a scenario preset.";
 
   return (
     <>
       <div className="rounded-xl border border-grid bg-surface p-4 text-sm leading-relaxed text-ink">{verdict}</div>
-      <Breakdown o={o} />
 
-      <Section letter="A" title="How does the price move over time?"
-        question="The donation lifts the true win chance; the market takes time to follow. How long until the donation is earned back?"
+      <Section letter="A" title="How does the trade work?"
+        question="The donation lifts the true win chance; the price follows. What does the donor end up with if the candidate wins, and if they lose?"
         controls={
           <>
             <MSlider param="boost" label="Boost from a $50M donation" value={ui.boost} min={0} max={0.2} step={0.001}
               display={`+${(ui.boost * 100).toFixed(1)} pts`} onChange={(v) => set({ boost: v })} />
             {donationSlider}
-            <MSlider param="belief" label="Market belief" value={ui.belief} min={0} max={2} step={0.05}
-              display={`${Math.round(ui.belief * 100)}%`} readout="share of the true boost the market prices"
-              onChange={(v) => set({ belief: v })} />
-            <MSlider param="halfLife" label="Market catch-up half-life" value={ui.halfLife} min={0} max={6} step={0.25}
-              display={ui.halfLife === 0 ? "instant" : months(ui.halfLife)} onChange={(v) => set({ halfLife: v })} />
-            {holdSlider}
+            {capitalSlider}
+            {captureSlider}
+            <MSlider param="payoff" label="Payoff if the candidate wins (V)" value={ui.payoff} min={0} max={2e9} step={10e6}
+              display={ui.payoff === 0 ? "none (pure trade)" : moneyShort(ui.payoff)} onChange={(v) => set({ payoff: v })} />
             <AdvancedGroup modified={advancedA}>
               <MSlider param="baseProb" label="Win probability, no donation (p₀)" value={ui.baseProb} min={0.05} max={0.95} step={0.01}
                 display={`${(ui.baseProb * 100).toFixed(0)}%`} onChange={(v) => set({ baseProb: v })} />
@@ -367,94 +316,87 @@ function Sections({
             </AdvancedGroup>
           </>
         }>
-        <ChartCard n={1} ringed={ringed(1)} title="Price over time"
-          takeaway={<>The market price starts at <strong>{pct(ui.baseProb, 1)}</strong> and drifts toward <strong>{pct(o.target_price, 1)}</strong>. The true win chance with the donation is {pct(o.true_prob, 1)}.</>}>
-          <LineChart
-            ariaLabel="Market price of YES over time, with its starting and eventual levels"
-            x={tc.months}
-            series={[
-              { key: "price", label: "Market price", color: CAT[0], y: tc.market_price },
-              { key: "target", label: "Eventual price", color: CAT[1], y: tc.target_price, dashed: true },
-              { key: "start", label: "Starting price", color: CAT[2], y: tc.start_price, dashed: true },
-              ...ghostPrice,
-            ]}
-            xFormat={months} yFormat={(v) => pct(v, 1)} xTitle="Months after buying and donating" yTitle="YES price"
-            vlines={[{ x: ui.hold, label: "Your sale" }]} />
+        <ChartCard n={1} ringed={ringed(1)} title="How the probability moves"
+          takeaway={<>The donation lifts the true win chance by <strong>{pts(st.true_move)}</strong>. The price captures {pct(ui.capture, 0)} of that, so it moves <strong>{pts(st.price_move)}</strong>, and that is what the trade earns on.</>}>
+          <ProbabilitySteps start={d.scenario.base_win_prob} price={o.price_after} truth={o.true_prob} />
         </ChartCard>
 
-        <ChartCard n={2} ringed={ringed(2)} title="Profit by when you sell"
-          takeaway={
-            be === null
-              ? <>Profit never reaches zero: even if the market closed the whole gap, the gain would be smaller than the donation.</>
-              : be === 0
-                ? <>There is no donation to earn back, so every sale time is profitable.</>
-                : <>Profit rises as the market catches up and breaks even after <strong>{months(be)}</strong>. Waiting costs nothing here, so a longer hold only helps; the curve flattens once the market has caught up.</>
-          }>
-          <LineChart
-            ariaLabel="Net profit by hold time"
-            x={tc.months}
-            series={[{ key: "net", label: "Net profit", color: CAT[0], y: tc.profit }, ...ghostHold]}
-            xFormat={months} yFormat={moneyShort} xTitle="Hold time" yTitle="Profit vs doing nothing"
-            zeroLine vlines={holdLines} />
+        <ChartCard n={2} ringed={ringed(2)} title="Payoff by outcome"
+          takeaway={<>The trade earns <strong>{money(o.trade_profit)}</strong> whichever way the election goes, so the losing case improves from {money(o.payoff_lose_no_trade)} to <strong>{money(o.payoff_lose)}</strong>.</>}>
+          <PayoffTable o={o} />
         </ChartCard>
       </Section>
 
-      <Section letter="B" title="How big should the trade be?"
-        question="A bigger donation moves the price more; a bigger position earns more from each point. With no fees or price impact, profit grows in a straight line with the position."
+      <Section letter="B" title="How big should it be?"
+        question="A bigger position earns more on each point of price move; a bigger donation moves the price more. With no fees or price impact, the trade grows in a straight line with the position."
         controls={
           <>
             {donationSlider}
             {capitalSlider}
-            {holdSlider}
           </>
         }>
-        <ChartCard n={3} ringed={ringed(3)} title="Profit by donation size"
-          takeaway={
-            st.optimal_donation > 0
-              ? <>With your trade size and sell time, the best donation is <strong>{moneyShort(st.optimal_donation)}</strong> ({money(st.optimal_donation_profit)}). The peak is where one more donated dollar stops returning a dollar.</>
-              : <>At your trade size and sell time, no donation size makes the trade pay.</>
-          }>
+        <ChartCard n={3} ringed={ringed(3)} title="Payoff by trade size"
+          takeaway={<>Buying more YES lifts both outcomes by the same amount, so the gap between winning and losing stays at <strong>{moneyShort(d.scenario.payoff_if_win)}</strong>.{beQ !== null && <> If the candidate loses, the donor breaks even at <strong>{moneyShort(beQ)}</strong> of YES.</>}</>}>
           <LineChart
-            ariaLabel="Net profit by donation size"
-            x={dc.donation}
-            series={[{ key: "net", label: "Net profit", color: CAT[0], y: dc.profit }, ...ghostDon]}
-            xFormat={moneyShort} yFormat={moneyShort} xTitle="Donation" yTitle="Profit vs doing nothing"
-            zeroLine vlines={donationLines} />
+            ariaLabel="Payoff if the candidate wins, if they lose, and expected, by money spent on YES"
+            x={cc.capital}
+            series={[
+              { key: "win", label: "If wins", color: CAT[0], y: cc.payoff_win },
+              { key: "lose", label: "If loses", color: CAT[1], y: cc.payoff_lose },
+              { key: "exp", label: "Expected", color: CAT[2], y: expectedAbs(cc.payoff_win, cc.payoff_lose), dashed: true },
+              ...ghostCap,
+            ]}
+            xFormat={moneyShort} yFormat={moneyShort} xTitle="Money spent on YES" yTitle="Payoff, after the donation"
+            zeroLine vlines={capitalLines} />
         </ChartCard>
 
-        <ChartCard n={4} ringed={ringed(4)} title="Profit by trade size"
+        <ChartCard n={4} ringed={ringed(4)} title="Profit by donation size"
           takeaway={
-            beQ !== null
-              ? <>Each dollar in YES earns <strong>{pct(st.return_per_dollar)}</strong>, so profit rises in a straight line. The donation is earned back at <strong>{moneyShort(beQ)}</strong> of YES.</>
-              : <>The price has not risen, so no trade size earns back the donation.</>
+            st.optimal_donation > 0
+              ? <>The best donation is <strong>{moneyShort(st.optimal_donation)}</strong> ({money(st.optimal_donation_ev)} of expected gain). The peak is where one more donated dollar stops returning a dollar.</>
+              : <>At these settings no donation size pays: every donated dollar returns less than a dollar.</>
           }>
           <LineChart
-            ariaLabel="Net profit by money spent on YES"
-            x={cc.capital}
-            series={[{ key: "net", label: "Net profit", color: CAT[0], y: cc.profit }, ...ghostCap]}
-            xFormat={moneyShort} yFormat={moneyShort} xTitle="Money spent on YES" yTitle="Profit vs doing nothing"
-            zeroLine vlines={capitalLines} />
+            ariaLabel="Expected gain and the trade net of the donation, by donation size"
+            x={dc.donation}
+            series={[
+              { key: "ev", label: "Expected gain", color: CAT[0], y: dc.ev },
+              { key: "lose", label: "If loses", color: CAT[1], y: dc.profit, dashed: true },
+              ...ghostDon,
+            ]}
+            xFormat={moneyShort} yFormat={moneyShort} xTitle="Donation" yTitle="Gain vs doing nothing"
+            zeroLine vlines={donationLines} />
         </ChartCard>
       </Section>
 
-      <Section letter="C" title="Where does it pay?"
-        question="How the answer changes across the time assumptions, and across the two dollar levers.">
-        <ChartCard n={5} ringed={ringed(5)} title="When does timing pay?"
-          takeaway={<>Profit by hold time and by how slowly the market reacts. A slow market needs a long hold. {noPay}</>}>
-          <Heatmap
-            ariaLabel="Net profit by hold time and market catch-up half-life"
-            xs={d.sweeps.time.hold_months} ys={d.sweeps.time.half_life_months} z={d.sweeps.time.profit} yScale="log"
-            xFormat={months} yFormat={(v) => `${v.toFixed(1)} mo`} valueFormat={money}
-            xTitle="Hold time" yTitle="Market half-life"
-            marker={{ x: ui.hold, y: Math.max(ui.halfLife, 0.1), label: "your scenario" }}
-            ghost={g ? { x: g.scenario.hold_months, y: Math.max(g.scenario.half_life_months, 0.1) } : null} />
+      <Section letter="C" title="What if the market responds differently?"
+        question="The election result does not change the trade profit, but the market's reaction does. This is where the risk in the trade sits."
+        controls={
+          <>
+            {captureSlider}
+            {capitalSlider}
+          </>
+        }>
+        <ChartCard n={5} ringed={ringed(5)} title="Profit by market response"
+          takeaway={<>The trade earns back the donation once the price captures <strong>{beC === null ? "—" : pct(beC, 0)}</strong> of the boost. If the market ignores the donation, the worst case is {money(d.responses[0].payoff_lose)}: just the donation.</>}>
+          <LineChart
+            ariaLabel="Expected gain and the result if the candidate loses, by share of the boost the price captures"
+            x={pc.capture}
+            series={[
+              { key: "ev", label: "Expected gain", color: CAT[0], y: pc.ev },
+              { key: "lose", label: "If loses", color: CAT[1], y: pc.profit, dashed: true },
+              ...ghostCapture,
+            ]}
+            xFormat={(v) => pct(v, 0)} yFormat={moneyShort} xTitle="Share of the boost the price captures" yTitle="Gain vs doing nothing"
+            zeroLine vlines={captureLines} />
+          <ResponseTable responses={d.responses} />
         </ChartCard>
 
         <ChartCard n={6} ringed={ringed(6)} title="When does size pay?"
-          takeaway={<>Profit by donation and by money spent on YES. The donation is a fixed price of entry; the position size decides whether the price move covers it. {noPay}</>}>
+          takeaway={<>Expected gain by donation and by money spent on YES. The donation is a fixed price of entry; the position size decides whether the price move covers it. {noPay}</>}>
           <Heatmap
-            ariaLabel="Net profit by donation and money spent on YES"
-            xs={d.sweeps.size.donation} ys={d.sweeps.size.capital} z={d.sweeps.size.profit}
+            ariaLabel="Expected gain by donation and money spent on YES"
+            xs={d.sweeps.size.donation} ys={d.sweeps.size.capital} z={d.sweeps.size.ev}
             xFormat={moneyShort} yFormat={moneyShort} valueFormat={money}
             xTitle="Donation" yTitle="Money spent on YES"
             marker={{ x: ui.donation, y: ui.capital, label: "your scenario" }}

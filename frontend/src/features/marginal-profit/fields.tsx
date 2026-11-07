@@ -8,27 +8,23 @@ import { AFFECTS, CHART_TITLES, type ParamId } from "./scenario";
 export const TIPS: Record<ParamId, [string, string]> = {
   boost: [
     "Win-probability boost from a $50M donation",
-    "How many points of true win probability a $50M donation buys. The market only sees as much of this as the belief slider says. Studies of campaign spending find a few points at most.",
+    "How many points of true win probability a $50M donation buys. The price only follows as much of this as the capture slider says. Studies of campaign spending find a few points at most.",
   ],
   donation: [
     "Donation (D)",
-    "What the donor gives. It is a sunk cost: the trade has to earn it back. It raises the true win probability along the donation-effect curve, and that is the move the market is expected to price in.",
+    "What the donor gives. It is spent whether the candidate wins or loses, and it raises the true win probability along the donation-effect curve. That rise is what the price is expected to follow.",
   ],
   capital: [
     "Money spent on YES",
-    "Dollars used to buy YES contracts before the donation. Each dollar earns the same return, so profit grows in a straight line with this (the model has no fees and no price impact). The donation is a fixed cost, so a bigger position is what earns it back.",
+    "Dollars used to buy YES contracts before the donation, at the starting price. Each dollar earns the same return, so the trade profit grows in a straight line with this (the model has no fees and no price impact). It is the same whether the candidate wins or loses, because you sell before the election.",
   ],
-  hold: [
-    "Hold time",
-    "Months between buying YES and selling it. Waiting costs nothing in this model, so a longer hold only helps: it just takes time for the market to catch up. Sell too early and you leave part of the move behind.",
+  capture: [
+    "Share of the boost the price captures",
+    "How far the price has moved toward the new win probability by the time you sell. 100% means it has fully caught up; 50% means half; 0% means the market ignored the donation; above 100% means it over-reacted. It folds in both how much the market believes the donation and how long you wait.",
   ],
-  halfLife: [
-    "Market catch-up half-life",
-    "How slowly the market notices. Every half-life, half of the remaining gap between today's price and its eventual level closes. 0 means the price jumps immediately after you buy; larger means it drifts.",
-  ],
-  belief: [
-    "Market belief",
-    "The share of the true boost that the market ends up pricing. 100% means it eventually agrees with the model. Below that, traders discount the donation's effect; above it, they over-react. This sets where the price is heading, not how fast.",
+  payoff: [
+    "Payoff if the candidate wins (V)",
+    "What the donor receives if the candidate wins, in dollars, and nothing otherwise. Set it to $0 to see the trade on its own. It does not change the trade profit, which is earned either way. It only adds the expected value of the higher win probability, and sets the gap between the win and lose outcomes.",
   ],
   baseProb: [
     "Win probability, no donation (p₀)",

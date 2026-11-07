@@ -5,9 +5,8 @@ export interface UiState {
   boost: number; // win-probability boost from a $50M donation (0.027 = 2.7 points)
   donation: number; // $
   capital: number; // $ spent buying YES
-  hold: number; // months between buying and selling
-  halfLife: number; // months for the market to close half of the remaining gap (0 = instant)
-  belief: number; // share of the true boost the market ends up pricing
+  capture: number; // share of the true boost the price captures by the time you sell
+  payoff: number; // $ received if the candidate wins (0 = pure trade)
   // advanced
   baseProb: number;
   effectForm: EffectForm;
@@ -18,24 +17,23 @@ export const DEFAULT_UI: UiState = {
   boost: 0.027,
   donation: 10e6,
   capital: 100e6,
-  hold: 3,
-  halfLife: 1,
-  belief: 1,
+  capture: 1,
+  payoff: 100e6,
   baseProb: 0.5,
   effectForm: "log",
   effectScale: 10e6,
 };
 
 export type ParamId =
-  | "boost" | "donation" | "capital" | "hold" | "halfLife" | "belief"
+  | "boost" | "donation" | "capital" | "capture" | "payoff"
   | "baseProb" | "effectForm" | "effectScale";
 
 export const CHART_TITLES: Record<number, string> = {
-  1: "Price over time",
-  2: "Profit by when you sell",
-  3: "Profit by donation size",
-  4: "Profit by trade size",
-  5: "When does timing pay?",
+  1: "How the probability moves",
+  2: "Payoff by outcome",
+  3: "Payoff by trade size",
+  4: "Profit by donation size",
+  5: "Profit by market response",
   6: "When does size pay?",
 };
 
@@ -48,10 +46,9 @@ export const AFFECTS: Record<ParamId, Record<number, Kind>> = {
   baseProb: all("curve"),
   effectForm: all("curve"),
   effectScale: all("curve"),
-  belief: all("curve"),
-  donation: { 1: "curve", 2: "curve", 3: "marker", 4: "curve", 5: "curve", 6: "marker" },
-  halfLife: { 1: "curve", 2: "curve", 3: "curve", 4: "curve", 5: "marker", 6: "curve" },
-  hold: { 1: "marker", 2: "marker", 3: "curve", 4: "curve", 5: "marker", 6: "curve" },
-  capital: { 2: "curve", 3: "curve", 4: "marker", 5: "curve", 6: "marker" },
+  donation: { 1: "curve", 2: "curve", 3: "curve", 4: "marker", 5: "curve", 6: "marker" },
+  capital: { 2: "curve", 3: "marker", 4: "curve", 5: "curve", 6: "marker" },
+  capture: { 1: "curve", 2: "curve", 3: "curve", 4: "curve", 5: "marker", 6: "curve" },
+  payoff: { 2: "curve", 3: "curve", 4: "curve", 5: "curve", 6: "curve" },
 };
 export const affectedCharts = (p: ParamId) => Object.keys(AFFECTS[p]).map(Number);

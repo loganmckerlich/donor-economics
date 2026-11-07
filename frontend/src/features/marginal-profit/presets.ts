@@ -7,56 +7,56 @@ export interface Preset {
   ui: Partial<UiState>;
 }
 
-/** One-click scenarios. Anything not listed resets to the defaults. Profits quoted in the blurbs come from the Python model. */
+/** One-click scenarios. Anything not listed resets to the defaults. Figures quoted in the blurbs come from the Python model. */
 export const PRESETS: Preset[] = [
   {
     id: "literature",
     label: "Literature-sized effect",
     blurb:
-      "The default. A $10M donation moves the price about 1 point by month 3, but the position needs 5 points to earn the donation back, so it loses about $8M. Even if the market caught up fully it would not pay at this size.",
+      "The default. A $10M donation lifts the price about 1 point, so $100M of YES earns only $2.1M, less than the donation costs. The donor is $7.9M behind if the candidate loses and $92M ahead if they win. At this position size no donation pays.",
     ui: {},
   },
   {
     id: "huge",
     label: "Literature effect, huge position",
     blurb:
-      "The same weak effect, but $1B of YES instead of $100M. With no fees and no price impact in the model, profit scales with the size of the position, so the same 1-point move now earns about $8M. Real markets could not absorb this: that friction is outside the model.",
+      "The same weak effect, but $1B of YES. With no fees and no price impact in the model, the trade scales with the position, so it earns $20.9M and the donor is $10.9M ahead even if the candidate loses. Real markets could not absorb this: that friction is outside the model.",
     ui: { capital: 1e9 },
   },
   {
     id: "strong",
     label: "Strong effect",
     blurb:
-      "An 8-point boost from $50M. A $40M donation with $500M of YES, sold after 3 months, earns about $23M. It breaks even after about 1.2 months.",
+      "An 8-point boost from $50M. A $40M donation with $500M of YES earns $71.9M on the trade, so the donor is $31.9M ahead even if the candidate loses, and $131.9M ahead if they win (with a $100M win payoff).",
     ui: { boost: 0.08, donation: 40e6, capital: 500e6 },
   },
   {
-    id: "fast",
-    label: "Fast market",
+    id: "stakes",
+    label: "High-stakes race",
     blurb:
-      "The same trade, but the market catches up in days (half-life 0.25 months). Selling after 2 months captures nearly all of the move and earns about $32M.",
-    ui: { boost: 0.08, donation: 40e6, capital: 500e6, hold: 2, halfLife: 0.25 },
+      "The same trade with a $1B win payoff. The trade still earns $71.9M either way. If the candidate loses the donor is $31.9M ahead; if they win, $1,031.9M ahead. The trade does not remove the election risk (the gap between the two is the $1B payoff). It adds the same amount to both outcomes.",
+    ui: { boost: 0.08, donation: 40e6, capital: 500e6, payoff: 1e9 },
   },
   {
-    id: "slow",
-    label: "Slow market",
+    id: "ignores",
+    label: "Market ignores it",
     blurb:
-      "The same trade, but the market takes months to react (half-life 4 months). After 2 months only about 30% of the move has happened and the position loses about $19M. It would break even if held about 4.7 months, so waiting rescues it.",
-    ui: { boost: 0.08, donation: 40e6, capital: 500e6, hold: 2, halfLife: 4 },
+      "The price never moves (capture 0%). The trade earns nothing, and with no fees it also loses nothing, so the worst case is the donation itself: $40M behind if the candidate loses, $960M ahead if they win. Adding the trade never made this worse.",
+    ui: { boost: 0.08, donation: 40e6, capital: 500e6, payoff: 1e9, capture: 0 },
   },
   {
-    id: "skeptic",
-    label: "Skeptical market",
+    id: "half",
+    label: "Market prices half",
     blurb:
-      "Traders only believe 40% of the donation's real effect, so the price settles well short of the true win chance. The position loses about $15M, and no amount of waiting fixes it: the price never rises far enough.",
-    ui: { boost: 0.08, belief: 0.4, donation: 40e6, capital: 500e6 },
+      "The price captures half of the boost by the time you sell. The trade earns $35.9M, which almost covers the $40M donation: the donor is $4.1M behind if the candidate loses and $995.9M ahead if they win.",
+    ui: { boost: 0.08, donation: 40e6, capital: 500e6, payoff: 1e9, capture: 0.5 },
   },
   {
     id: "overreact",
-    label: "Over-reacting market",
+    label: "Market over-reacts",
     blurb:
-      "A modest 5-point effect, but traders over-react and price in twice the true boost. That is a gift to a buyer who is early: about $38M on a $30M donation and $500M of YES.",
-    ui: { boost: 0.05, belief: 2, donation: 30e6, capital: 500e6 },
+      "A modest 5-point effect, but the price captures twice the true boost. That is a gift to a buyer who is early: the trade earns $77.4M on a $30M donation, so the donor is $47.4M ahead even if the candidate loses.",
+    ui: { boost: 0.05, donation: 30e6, capital: 500e6, payoff: 1e9, capture: 2 },
   },
 ];
 
