@@ -1,4 +1,5 @@
-export type EffectForm = "log" | "linear" | "saturating";
+import type { EffectForm } from "@/lib/effect";
+import { post } from "@/lib/http";
 
 export interface ScenarioParams {
   payoff_if_win: number;
@@ -65,34 +66,23 @@ export interface HedgeValueHeatmap {
   ce_gain: number[][]; // [risk_aversion][donation]
 }
 
-async function post<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
-  const res = await fetch(path, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-    signal,
-  });
-  if (!res.ok) throw new Error(`${path} failed: ${res.status}`);
-  return res.json();
-}
-
 export const fetchAnalysis = (
   scenario: ScenarioParams,
   donation: number,
   hedgeFraction: number,
   signal?: AbortSignal,
-) => post<Analysis>("/api/analysis", { scenario, donation, hedge_fraction: hedgeFraction }, signal);
+) => post<Analysis>("/api/full-hedge/analysis", { scenario, donation, hedge_fraction: hedgeFraction }, signal);
 
 export const fetchDonationHeatmap = (scenario: ScenarioParams, signal?: AbortSignal) =>
   post<DonationHeatmap>(
-    "/api/sweep/donation-heatmap",
+    "/api/full-hedge/sweep/donation-heatmap",
     { scenario, effect_size_range: [0, 0.1], payoff_range: [20e6, 10e9], n: 25 },
     signal,
   );
 
 export const fetchHedgeValue = (scenario: ScenarioParams, signal?: AbortSignal) =>
   post<HedgeValueHeatmap>(
-    "/api/sweep/hedge-value",
+    "/api/full-hedge/sweep/hedge-value",
     { scenario, risk_aversion_range: [1e-11, 1e-7], donation_range: [0, 150e6], n: 25 },
     signal,
   );

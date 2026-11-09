@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import GlossaryApp from "@/components/GlossaryApp";
 
 export const metadata: Metadata = {
-  title: "Glossary | Donor Hedge Explorer",
+  title: "Glossary | Donor Economics",
   description: "Glossary and background notes on hedging, prediction markets and political donations.",
 };
 

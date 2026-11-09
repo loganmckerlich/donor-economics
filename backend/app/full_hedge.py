@@ -1,8 +1,11 @@
-"""Chart data builders. Thin layer over ``donor_economics``; all money in dollars."""
+"""Full hedge strategy API: request schemas, chart data builders and routes. All money in dollars."""
 
 from dataclasses import asdict, replace
+from typing import Literal
 
 import numpy as np
+from fastapi import APIRouter
+from pydantic import BaseModel, Field
 
 from donor_economics import (
     Scenario,
@@ -14,24 +17,13 @@ from donor_economics import (
     optimal_hedge,
 )
 
+from .util import clean
+
 # Reference risk aversions for the "CE gain vs hedge size" chart (CARA a, 1/$).
 # a ~ gamma / wealth: 4e-10 = gamma 2 on $5B, 2e-9 = gamma 10 on $5B, 1e-8 = stress case.
 REFERENCE_A = (4e-10, 2e-9, 1e-8)
 FORMS = ("log", "linear", "saturating")
 MAX_DONATION = 1e9
-
-
-def _clean(x):
-    """Recursively turn numpy scalars/arrays into JSON-safe python."""
-    if isinstance(x, dict):
-        return {k: _clean(v) for k, v in x.items()}
-    if isinstance(x, (list, tuple)):
-        return [_clean(v) for v in x]
-    if isinstance(x, np.ndarray):
-        return x.tolist()
-    if isinstance(x, np.generic):
-        return x.item()
-    return x
 
 
 def analysis(
@@ -85,7 +77,7 @@ def analysis(
         "ce_gain_by_a": ref,
     }
 
-    return _clean(
+    return clean(
         {
             "scenario": asdict(s),
             "donation": donation,
@@ -120,7 +112,7 @@ def donation_heatmap(
          for v in vs]
         for k in ks
     ]
-    return _clean({"effect_size": ks, "payoff": vs, "optimal_donation": z})
+    return clean({"effect_size": ks, "payoff": vs, "optimal_donation": z})
 
 
 def hedge_value_heatmap(
@@ -141,4 +133,60 @@ def hedge_value_heatmap(
                 certainty_equivalent(p, wh, lh, float(a)) - certainty_equivalent(p, win0, lose0, float(a))
             )
         z.append(row)
-    return _clean({"risk_aversion": a_grid, "donation": d_grid, "ce_gain": z})
+    return clean({"risk_aversion": a_grid, "donation": d_grid, "ce_gain": z})
+
+# --- Request schemas -------------------------------------------------------------------------
+
+
+class ScenarioIn(BaseModel):
+    payoff_if_win: float = Field(100e6, gt=0, le=1e12)
+    base_win_prob: float = Field(0.50, gt=0, lt=0.99)
+    effect_size: float = Field(0.015, ge=0, le=1)
+    effect_scale: float = Field(10e6, gt=0, le=1e11)
+    effect_form: Literal["log", "linear", "saturating"] = "log"
+    risk_aversion: float = Field(0.0, ge=0, le=1e-5)
+
+    def to_model(self) -> Scenario:
+        return Scenario(**self.model_dump())
+
+
+class AnalysisIn(BaseModel):
+    scenario: ScenarioIn = ScenarioIn()
+    donation: float = Field(50e6, ge=0, le=1e11)
+    hedge: float | None = Field(25e6, ge=0, le=1e12)  # null = use the full hedge
+    # Hedge as a fraction of the full (zero-variance) hedge; takes precedence over `hedge` when set.
+    hedge_fraction: float | None = Field(None, ge=0, le=5)
+
+
+class DonationHeatmapIn(BaseModel):
+    scenario: ScenarioIn = ScenarioIn()
+    effect_size_range: tuple[float, float] = (0.0, 0.1)
+    payoff_range: tuple[float, float] = (20e6, 10e9)  # log-spaced
+    n: int = Field(25, ge=5, le=60)
+
+
+class HedgeValueIn(BaseModel):
+    scenario: ScenarioIn = ScenarioIn()
+    risk_aversion_range: tuple[float, float] = (1e-11, 1e-7)  # log-spaced
+    donation_range: tuple[float, float] = (0.0, 150e6)
+    n: int = Field(25, ge=5, le=60)
+
+
+# --- Routes ----------------------------------------------------------------------------------
+
+router = APIRouter(prefix="/api/full-hedge", tags=["full hedge"])
+
+
+@router.post("/analysis")
+def post_analysis(body: AnalysisIn) -> dict:
+    return analysis(body.scenario.to_model(), body.donation, body.hedge, body.hedge_fraction)
+
+
+@router.post("/sweep/donation-heatmap")
+def post_donation_heatmap(body: DonationHeatmapIn) -> dict:
+    return donation_heatmap(body.scenario.to_model(), body.effect_size_range, body.payoff_range, body.n)
+
+
+@router.post("/sweep/hedge-value")
+def post_hedge_value(body: HedgeValueIn) -> dict:
+    return hedge_value_heatmap(body.scenario.to_model(), body.risk_aversion_range, body.donation_range, body.n)

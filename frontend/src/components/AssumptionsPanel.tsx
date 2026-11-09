@@ -1,4 +1,23 @@
-import { ASSUMPTIONS, DEFAULT_SCENARIO_NOTE, DEPENDS, LEFT_OUT, type Assumption } from "@/lib/assumptions";
+/** Plain-language statements of what a model assumes, each with a worked example. */
+export interface Assumption {
+  title: string;
+  statement: string;
+  example: string;
+}
+
+/** One headline result, what it rests on, and what would change it. */
+export interface Dependency {
+  result: string;
+  rests: string;
+  breaks: string;
+}
+
+export interface AssumptionsContent {
+  note: string;
+  assumptions: Assumption[];
+  leftOut: Assumption[];
+  depends: Dependency[];
+}
 
 function Card({ a, marker }: { a: Assumption; marker: React.ReactNode }) {
   return (
@@ -18,7 +37,8 @@ function Card({ a, marker }: { a: Assumption; marker: React.ReactNode }) {
   );
 }
 
-export default function AssumptionsPanel() {
+export default function AssumptionsPanel({ content }: { content: AssumptionsContent }) {
+  const { note, assumptions: ASSUMPTIONS, leftOut: LEFT_OUT, depends: DEPENDS } = content;
   return (
     <details id="assumptions" className="group/ap rounded-xl border border-grid bg-surface">
       <summary className="flex cursor-pointer select-none items-center justify-between gap-3 px-4 py-3">
@@ -32,7 +52,7 @@ export default function AssumptionsPanel() {
       </summary>
 
       <div className="space-y-6 border-t border-grid px-4 py-4">
-        <p className="text-sm text-ink-3">{DEFAULT_SCENARIO_NOTE}</p>
+        <p className="text-sm text-ink-3">{note}</p>
 
         <section aria-labelledby="ap-assumes">
           <h3 id="ap-assumes" className="mb-2 text-sm font-semibold uppercase tracking-wide text-ink-3">What the model assumes</h3>

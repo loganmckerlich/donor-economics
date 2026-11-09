@@ -1,4 +1,4 @@
-import { DEFAULT_UI, type UiState } from "@/components/Controls";
+import { DEFAULT_UI, type UiState } from "./scenario";
 
 export interface Preset {
   id: string;

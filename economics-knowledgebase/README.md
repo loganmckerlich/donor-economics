@@ -1,12 +1,14 @@
 # Donor Hedging Economics Knowledgebase
 
-Background notes for `src/donor_economics/model.py`. Research date: 2026-11-05 (two days after the 2026 US midterms). Background research, partly unverified; not legal or financial advice.
+Background notes for the two models in `src/donor_economics/`: `full_hedge.py` (Full Hedge Strategy) and `marginal_profit.py` (Marginal Profit Strategy). Research date: 2026-11-05 (two days after the 2026 US midterms). Background research, partly unverified; not legal or financial advice.
 
 ## Question
 Can a billionaire donor who gains `V` if candidate A wins, and donates `D` to A, economically justify buying the NO side of A's market (size `H`) as a hedge?
 
-## The current model in brief
-Static, one binary contract. The donor receives `V` iff A wins; the donation `D` is a sunk cost. Win probability is `p(D) = min(p0 + k*ln(1 + D/s), 0.999)` by default. The market is efficient and reprices for the donation, so the YES price is `m = p(D)`, and the hedge buys NO at `1 - m`. Payoffs: win `V - D - H`; lose `-D + H*m/(1 - m)`. The donor has CARA utility (`a = 0` is risk-neutral).
+## The two models in brief
+**Full Hedge model.** Static, one binary contract. The donor receives `V` iff A wins; the donation `D` is a sunk cost. Win probability is `p(D) = min(p0 + k*ln(1 + D/s), 0.999)` by default. The market is efficient and reprices for the donation, so the YES price is `m = p(D)`, and the hedge buys NO at `1 - m`. Payoffs: win `V - D - H`; lose `-D + H*m/(1 - m)`. The donor has CARA utility (`a = 0` is risk-neutral).
+
+**Marginal Profit model.** The donor buys `Q` dollars of YES at the pre-donation price `p0`, donates `D`, and sells the YES after the price has gone up, before the election. The price captures a share `capture` of the true boost, so it ends at `p0 + capture * (p(D) - p0)`; one number stands in for both how much the market believes the donation and how long the donor waits. Like the Full Hedge model it is frictionless: orders fill at the quoted price, with no fees, spread, price impact or cost of cash. The trade profit `(Q / p0) * (price after - p0)` is the same whether or not the candidate wins, so the payoffs are: wins `V - D + trade profit`, loses `-D + trade profit`. The expected gain compared with doing nothing is `trade profit - D + V * (p(D) - p0)`. The two models share the donation effect curve `p(D)`.
 
 ## How the model maps to the topics
 
@@ -18,9 +20,11 @@ Static, one binary contract. The donor receives `V` iff A wins; the donation `D`
 | `risk_aversion` (a) | CARA coefficient in 1/$, roughly gamma / wealth; 0 = risk-neutral | [01 hedging](01-hedging-and-risk.md), [06 quant](06-quantitative-methods.md) |
 | `donation` (D) decision | Sunk cost; judged by `donation_ev` | [04 donations](04-political-donations.md) |
 | `hedge` (H) decision | Dollars on NO at `1 - m`; full hedge `H* = V*(1 - m)` | [01 hedging](01-hedging-and-risk.md) |
-| Market price `m = p(D)` | Efficient market reprices for the donation | [02 mechanics](02-prediction-market-mechanics.md), [06 quant](06-quantitative-methods.md) |
+| Market price `m = p(D)` | Efficient market reprices for the donation (Full Hedge model) | [02 mechanics](02-prediction-market-mechanics.md), [06 quant](06-quantitative-methods.md) |
+| `capture` (Marginal Profit) | Share of the true boost the price captures by the time the YES is sold | [02 mechanics](02-prediction-market-mechanics.md), [03 microstructure](03-microstructure-and-price-impact.md) |
+| `capital` (Q), `payoff_if_win` (V) (Marginal Profit) | Dollars spent on YES, and the payoff if the candidate wins (0 = pure trade) | [03 microstructure](03-microstructure-and-price-impact.md) (what is left out), [04 donations](04-political-donations.md) |
 
-**In the model:** hedging and risk aversion (01), the binary contract and efficient repricing (02), the donation effect (04), and expected utility (06). **Extensions (outside the current model's scope):** fees and depth (02), price impact and signaling (03), legal, tax and platform risk (05), and the calibration and Monte Carlo ideas (06). Notes 02, 03 and 05 are kept as background, and each has an "Implications" section mapping them onto the model if added later.
+**In the model:** hedging and risk aversion (01), the binary contract and efficient repricing (02), the donation effect (04), and expected utility (06). **Extensions (outside both models):** fees and depth (02), price impact, signaling and manipulation (03), position limits, legal, tax and platform risk (05), anticipation of the donation by other traders, and the calibration and Monte Carlo ideas (06). Notes 02, 03 and 05 are kept as background, and each has an "Implications" section mapping them onto the models.
 
 ## Files
 1. [01-hedging-and-risk.md](01-hedging-and-risk.md): variance, utility, full vs partial hedges, why hedge at zero EV.
@@ -40,4 +44,4 @@ Static, one binary contract. The donor receives `V` iff A wins; the donation `D`
 2. The donation decision is the interesting one, and the donation effect size is the crux. Evidence that marginal campaign dollars move outcomes is weak-to-modest (Levitt, Gerber), so `effect_size` should give only a few points of win probability at $50M. With the defaults (V=$100M, p0=0.50, k=0.015, s=$10M), p($50M) = 0.527 and the donation is about -$47.3M EV against not donating; the hedge cannot rescue it. Large lifts are an assumption, not a finding.
 3. Frictions are real-world extensions, not in the model. Kalshi's taker fee is `0.07*C*P*(1-P)` (peaks ~1.75c/contract at 50c); Polymarket US charges makers 0 and takers a category rate (sources conflict, see 02). Each fee would make the hedge cost positive and the optimal hedge partial.
 4. Depth and price impact are also extensions: a $50M-scale NO purchase is feasible in headline markets only with real slippage; 2024 presidential market volume was in the billions but top-of-book depth is [Unverified]. Kalshi position limits were reported at $7M/strike for non-ECPs and $100M for ECPs (2024 rule text, check current), which would cap `H` below `H*`.
-5. Legal risk is real but outside the model: the CFTC treats insider/manipulation conduct in prediction markets as an enforcement priority (2026), Kalshi bars candidates and staff from trading their own races, and the federal/state preemption fight is unresolved. Hedge viability is conditional on legal clearance.
+5. Legal risk is real but outside the models, and it is acute for the Marginal Profit Strategy, whose profit comes only from a price move the donor causes and knows about in advance (a manipulation and non-public-information concern, see file 05). More generally: the CFTC treats insider/manipulation conduct in prediction markets as an enforcement priority (2026), Kalshi bars candidates and staff from trading their own races, and the federal/state preemption fight is unresolved. Hedge viability is conditional on legal clearance.

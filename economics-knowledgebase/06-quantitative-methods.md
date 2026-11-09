@@ -25,7 +25,7 @@ For a binary bet buying YES at price `c` with true probability `p`: optimal frac
 - Implication for a NO hedge: if A is the underdog (YES price low), NO is the *favorite* side, which historically earns small positive returns; if A is the favorite, NO is the longshot and is overpriced, so hedging is costlier. [Direction per Kalshi finding; magnitude not quantified here.]
 
 ## Possible next modelling steps (extensions)
-Already done in the current model: risk aversion (CARA) with certainty-equivalent output, `optimal_hedge`, `optimal_donation`, a donation effect curve with log/linear/saturating forms, and an efficient market that reprices (`m = p(D)`). Remaining ideas:
+Already done in the Full Hedge model: risk aversion (CARA) with certainty-equivalent output, `optimal_hedge`, `optimal_donation`, a donation effect curve with log/linear/saturating forms, and an efficient market that reprices (`m = p(D)`). Remaining ideas:
 1. Replace the zero fee with Kalshi/Polymarket schedules; add spread and per-venue taker/maker choice. A fee makes the hedge cost positive.
 2. Impact: add linear and sqrt options and an order-book walk; plot cost vs `H`.
 3. Add position limits and a feasibility flag (cap on `H`).

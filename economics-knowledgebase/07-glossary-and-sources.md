@@ -10,7 +10,7 @@
 | Maker / taker | Provider of resting liquidity / order that crosses the spread |
 | Spread | Best ask minus best bid |
 | Slippage | Difference between expected and executed price |
-| Price impact | Move in price caused by your order (assumed zero in the current model) |
+| Price impact | Move in price caused by your order. Both models assume it is zero: the whole order fills at the quoted price, so impact, depth, fees and carry cost are possible extensions |
 | Kyle's lambda | Linear impact coefficient |
 | DCM | Designated Contract Market (CFTC-registered exchange) |
 | ECP | Eligible Contract Participant |
@@ -36,13 +36,26 @@
 | Effect scale `s` (`effect_scale`) | Dollar scale of the donation curve; default $10M |
 | Base win probability `p0` (`base_win_prob`) | Probability A wins with no donation |
 | Payoff if win `V` (`payoff_if_win`) | Amount the donor receives if and only if A wins |
-| Efficient market repricing | The market is assumed to price in the donation, so the YES price is `m = p(D)` and the NO hedge costs `1 - m` per share; the donor has no edge |
+| Efficient market repricing | In the Full Hedge model the market is assumed to price in the donation, so the YES price is `m = p(D)` and the NO hedge costs `1 - m` per share; the donor has no edge |
 | Donation EV (Expected gain from your donation) | `(p(D) - p(0))*V - D`: expected gain from donating relative to not donating (`donation_ev`), independent of the hedge in the model. "Expected gain from your donation" is the app's name for this same quantity |
 | Best donation (optimal donation) | The donation that maximises expected profit compared with not donating (`optimal_donation`). $0 means donating does not pay at those assumptions |
 | First-dollar return | Expected winnings from the first dollar donated, `V*k/s`, the same for every curve form. Donating only pays when it exceeds $1 |
 | Break-even payoff | The payoff at which the first-dollar return reaches $1, `V = s/k`. With the default boost of 2.7 points and s = $10M (k about 0.0151) it is roughly $660M |
-| Price impact (out of scope) | Move in price caused by your order; the model assumes the whole order fills at the quoted price, so impact, depth, fees and carry cost are possible extensions |
 | Basis risk | Hedge instrument imperfectly matching exposure (e.g. a market resolving on a different event than the policy payoff) |
+| Full Hedge Strategy | The app's first page: donate to raise the win probability, then buy NO to hedge. Profit is judged at the election result, so the question is how much risk the hedge removes |
+| Marginal Profit Strategy | The app's second page: buy YES, donate, then sell the YES once its price has gone up, and optionally also keep the payoff if the candidate wins. Because the YES is sold before the election, the trade profit is the same whether or not the candidate wins. The donation is a sunk cost it has to earn back |
+| Market manipulation | Trading, or acting, with intent to move a market price. The CFTC's anti-manipulation rules (CEA 6(c)(1), Rule 180.1) cover this. The Marginal Profit Strategy resembles it because its profit comes only from a price move the donor causes; whether a donation counts is untested |
+| Market lag | The assumption the Marginal Profit Strategy rests on: the market prices in the donation only after the donor has bought. If traders anticipate the donation, the entry price already includes it and the profit disappears |
+| Money spent on YES (trade size) | Dollars used to buy YES contracts before the donation, `Q`. Shares bought are `Q / p0`. With no fees or price impact, the trade profit is a straight line in `Q` |
+| Capture (share of the boost the price captures) | How far the YES price has moved toward the new true win probability by the time you sell: `price after = p0 + capture * (p(D) - p0)`. 100% means it has fully caught up, 50% half, 0% means the market ignored the donation, and above 100% means it over-reacted. It stands in for both how much the market believes the donation and how long the donor waits |
+| Trade profit | The gain on the YES contracts, `(Q / p0) * (price after - p0)`. Because the YES is sold before the election, it is the same whether the candidate wins or loses, and it is added to both outcomes |
+| Payoff if the candidate loses / wins (Marginal Profit) | If the candidate loses: `trade profit - D`. If they win: `V - D + trade profit`. The trade adds the same amount to both, so the gap between them stays at the win payoff `V` and the trade does not remove the election risk. Negative means the trade did not earn back the donation |
+| Expected gain (Marginal Profit) | The probability-weighted result compared with doing nothing: `(trade profit - D) + V * (p(D) - p0)`. The first part is the trade net of the donation; the second is the value of the higher win probability, as on the Full Hedge page |
+| Market response | How far the price follows the donation. The app shows three fixed responses side by side (ignores it, prices half, prices all). With no fees, the worst case is that the price does not move, so the donor only loses the donation. The risk in the trade is in this response, not in the election |
+| Return per dollar | The gain per dollar spent on YES, `(price at exit - p0) / p0`. Net profit is this times `Q`, minus the donation |
+| Break-even trade size | The smallest position whose trade profit alone earns the donation back, `donation / return per dollar`. Below it the donor is behind if the candidate loses; above it, ahead |
+| Break-even price move | The rise in the YES price needed to earn the donation back, `donation / contracts held`. The trade only covers the donation when the actual price move beats it |
+| First-dollar return (Marginal Profit) | Expected gain from the first donated dollar, `(V + capture * Q / p0) * k / s`: the higher win probability pays `V`, and the higher price pays on the position. A donation only pays when it exceeds $1, like `V*k/s` in the Full Hedge model |
 
 ## Sources (retrieved 2026-11-05; headline claims only, see individual files)
 Contribution limits

@@ -1,4 +1,5 @@
-import type { EffectForm } from "./api";
+/** How donated dollars turn into win probability. Shared by both strategies. */
+export type EffectForm = "log" | "linear" | "saturating";
 
 /** The donation at which the "boost" slider is defined. */
 export const BOOST_REF = 50e6;
